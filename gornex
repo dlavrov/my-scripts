@@ -1,0 +1,187 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                   gornex                                  #
+$VERSION=                       "version 1.0"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 11/15/2001,                          #
+#############################################################################
+
+# Design
+# Create two lookup tables (upstream, downstream)
+# Create an array with 74 cells
+# Reformat gene boundaries
+# Get info from each of them
+# Print species, array to the file
+&usage if ($#ARGV <1);
+use strict;
+my $uphushref = createhush(0);
+my $downhushref = createhush(1);
+my @all_boundaries = ();
+my ($gorfile, $genepair, $taxlabels);
+my $outfile = "gorder.dat";
+my $i;
+for $i (0 .. $#ARGV) { #Read files from @ARGV extract gene arrangement from them;
+	$gorfile = $ARGV[$i];
+	my ($line, $boundary);
+	my @gene_boundaries;
+	open(IN,"<$gorfile") || die "Can't read from \"$gorfile\": $!\n";
+	while (<IN>) {
+	        next if /^;/;
+	        chomp($line = $_);
+		&usage unless ($line =~ /^\+|-\S+\+|-\S+\s+|-\S+\+|-\S+/);
+	        last;
+	}
+	close(IN) or die "Can't close $gorfile $!\n";
+	#make species name
+	$gorfile =~ s/^[^_]+_([^_]{1,5})[^_]*_([^_]{1,4}).*/$1_$2/;
+	my @gene_pairs = split(/ /,$line);
+	#open(OUT, ">>$outfile") or die "Can't write to \"gorder.dat\": $!\n";
+	foreach $genepair (@gene_pairs) {
+		my ($sign1, $gene1, $sign2, $gene2);
+		if ($genepair =~ /^(\+|-)(.+)(\+|-)(.+)$/) {
+			($sign1, $gene1, $sign2, $gene2) = ($genepair =~ /^(\+|-)(.+)(\+|-)(.+)$/);
+			$gene1 =~ s/(\w+)\((\w+)\)/$1_$2/ if ($gene1 =~ /\(\S+\)/) ; #get rid of the brackets
+			$gene2 =~ s/(\w+)\((\w+)\)/$1_$2/ if ($gene2 =~ /\(\S+\)/) ; #get rid of the brackets
+		}
+		else {print "Can't figure out this genepair: $genepair\n"; next;}
+		if ($sign1 eq "+" && $sign2 eq "+") {
+			$gene_boundaries[$downhushref->{$gene1}] = "5-$gene2"; #$uphushref->{$gene2};
+			$gene_boundaries[$uphushref->{$gene2}] = "3-$gene1"; #$downhushref->{$gene1};
+		}
+		elsif ($sign1 eq "-" && $sign2 eq "+") {
+                        $gene_boundaries[$uphushref->{$gene1}] = "5-$gene2"; #$uphushref->{$gene2}; #we will have to use table 2 for the other strand genes
+                        $gene_boundaries[$uphushref->{$gene2}] = "5-$gene1"; #$uphushref->{$gene1};
+		}						
+		elsif ($sign1 eq "+" && $sign2 eq "-") {
+			$gene_boundaries[$downhushref->{$gene1}] = "3-$gene2"; #$downhushref->{$gene2};
+			$gene_boundaries[$downhushref->{$gene2}] = "3-$gene1"; #$downhushref->{$gene1};
+		}
+		else {print "Can't figure out this genepair: $genepair\n";}
+	}
+	$taxlabels .= "\t\'$gorfile\'\n"; # unshift @gene_boundaries, "$gorfile";
+	$all_boundaries[$i] = [ @gene_boundaries ];
+}
+my ($arrayref, $statelabels) = convert_table(\@all_boundaries);
+@all_boundaries = @$arrayref; #I recicle @all_boundaries for new table
+
+#output
+#remove old output file (if exists)
+if (-e $outfile) {
+	print "Rewriting file \"$outfile\"!\n";
+}
+open(OUT, ">$outfile") || die "Can't write to \"$outfile\": $!\n";
+print OUT "#NEXUS
+begin data;
+dimensions ntax = " . scalar(@ARGV) . " nchar = 82;
+FORMAT MISSING=?  TRANSPOSE  SYMBOLS= \" A B C D E F G H I J K L M N O P Q R S T U V W X Y Z\";
+TAXLABELS
+$taxlabels\n;
+STATELABELS
+$statelabels
+;
+MATRIX\n";
+my @all_genes = sort (keys %$uphushref);
+push @all_genes, @all_genes;
+for $i (0 .. $#all_boundaries) {
+	$arrayref = $all_boundaries[$i];
+	my $gene = shift(@all_genes);
+	if ($i < 41) {print OUT "$gene"."_>\t@$arrayref\n";}
+	else {print OUT "<_$gene\t@$arrayref\n";}
+}
+print OUT ";\nend;\n";
+close(OUT) or die "Can't close \"$outfile\": $!\n";
+print "Done!\n";
+exit 0;
+
+#This routine creates a lookup table and returns a reference to it
+sub createhush {
+	my $downhash = shift(@_);
+	my $addme = $downhash ? 0 : 41;
+        my $retref = {
+                atp6 => 0+$addme,
+                atp8 => 1+$addme,
+		atp9 => 2+$addme,
+                cob => 3+$addme,
+                cox1 => 4+$addme,
+                cox2 => 5+$addme,
+                cox3 => 6+$addme,
+                nad1 => 7+$addme,
+                nad2 => 8+$addme,
+                nad3 => 9+$addme,
+                nad4 => 10+$addme,
+                nad4L => 11+$addme,
+                nad5 => 12+$addme,
+                nad6 => 13+$addme,
+                rnl => 14+$addme,
+                rns => 15+$addme,
+                trnA => 16+$addme,
+                trnC => 17+$addme,
+                trnD => 18+$addme,
+                trnE => 19+$addme,
+                trnF => 20+$addme,
+                trnG => 21+$addme,
+                trnH => 22+$addme,
+                trnI => 23+$addme,
+		trnI_cau => 24+$addme,
+                trnK => 25+$addme,
+                trnL_uaa => 26+$addme,
+                trnL_uag => 27+$addme,
+                trnM => 28+$addme,
+		trnM_caue => 29+$addme,
+                trnN => 30+$addme,
+                trnP => 31+$addme,
+                trnQ => 32+$addme,
+                trnR => 33+$addme,
+		trnR_ucu => 34+$addme,
+                trnS_gcu => 35+$addme,
+                trnS_uga => 36+$addme,
+                trnT => 37+$addme,
+                trnV => 38+$addme,
+                trnW => 39+$addme,
+                trnY => 40+$addme,
+	};
+	return $retref;
+}
+	
+sub convert_table {
+# converts the table so that the character states for each position are in array
+# character states are renamed as capital letters A-Z 
+# returns an array containing references to arrays for each position
+	my $arrayref = shift(@_);
+	my (@LoL_old, @LoL_new, @char_states, $aref, $key, $statelabels, $i, $j);
+	@LoL_old = @$arrayref;
+	for $j (0 .. 81) {
+        	for $i (0 .. $#LoL_old) {
+                	$aref = $LoL_old[$i];
+                	$char_states[$i] = shift @$aref;
+        	}
+        	my $ascii = 65;
+        	my %used_states = ();
+                for $i (0 .. $#char_states) {
+			if (defined $char_states[$i]) {
+                       		if (defined $used_states{$char_states[$i]}) {
+                                	$char_states[$i] = $used_states{$char_states[$i]};
+                        	}
+                        	else {
+                                	$used_states{$char_states[$i]} = chr($ascii);
+                                	$char_states[$i] = chr($ascii);
+                                	$ascii++;
+                        	}
+			}
+			else {$char_states[$i] = "?";}	
+                }
+                $statelabels .= $j+1 . " ";
+                foreach $key (sort { $used_states{$a} cmp $used_states {$b} } keys %used_states) { 
+                        $statelabels .= "\'$key\' ";
+                }
+        	$statelabels .= ",\n";
+        	$LoL_new[$j] = [ @char_states ];
+	}
+	return (\@LoL_new, $statelabels);
+}
+sub usage {
+        print "Usage: \"gornex files_to_convert\"\n";
+        print "Files should be of the valid type (.go files)\n";
+	exit;                                                                                     
+	} 

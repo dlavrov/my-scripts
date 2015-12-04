@@ -1,0 +1,772 @@
+#!/usr/bin/perl -w
+###################################################################
+#    Gene order analysis- Conversion to nexus matrix format	  #
+###################################################################
+# The program works on using a choice menu.
+# With choices 1, 3 and 5 appropriae single files can be uploaded and they are converted to gene order files and stored in memory
+# When choices 2,4 r 6 are made, all files listed in the inout file and read, converted into suitable format and
+# matrix is made with all files in memory.
+#Various subroutines are used to achieve this. D
+$VERSION = "version 1.0";
+
+use strict;
+#Conversion from masterfiles requires pepper program from http://megasun.bch.umontreal.ca/ogmp/ogmpid.htm
+#Conversion from genebank format requires l
+my $PEPPER = '/usr/local/bin/montreal/pepper';
+
+my $mgenes = "atp6 atp8 atp9 cob nad1 nad2 nad3 nad4 nad4L nad5 nad6 rns rnl";
+######################### Main program ############################
+#								  #
+# variables: @gofiles is an array of filenames. 		  #
+# All files analysed are add to it. 				  #
+# When matrix is made, all files in this array are used.	  #
+###################################################################
+
+print `clear`;
+
+my @gofiles;
+my $choice = -1;
+while ( $choice != 0 ) {
+
+    $choice = &message;
+
+    if ( $choice == 1 ) {
+
+	# Reads an input genbank file name and converts it to a gene order file.This file is stored in memory.
+        print "Enter the name of your file:\n";
+        my $file = <STDIN>;
+        chomp($file);
+        print("Invalid file name\n") unless ( defined $file && -r $file );
+        next unless ( defined $file && -r $file );
+        &gb2gor($file);
+    }
+    if ( $choice == 2 ) {
+
+        # Reads the gene order file entered and stores it in memory
+        print "Enter name of geneorder file:\n";
+        my $file2 = <STDIN>;
+        chomp($file2);
+        print("Invalid file name\n") unless ( defined $file2 && -r $file2 );
+        next unless ( defined $file2 && -r $file2 );
+        push( @gofiles, $file2 );
+    }
+    if ( $choice == 3 ) {
+
+        # Converts master file to gene order file and stores in memory
+        print "Enter the name of your file:\n";
+        my $file = <STDIN>;
+        chomp($file);
+        print("Invalid file name\n") unless ( defined $file && -r $file );
+        next unless ( defined $file && -r $file );
+        &mf2gor($file);
+    }
+    if ( $choice == 4 ) {
+
+	# Reads from a file containing names of genbank files to be analysed. Each file is converted to its respective
+	# gene order file. All these files are stored in memory and a matrix is created.
+        print("Enter name of file containing .gbk file names:");
+        my $file1 = <STDIN>;
+        chomp($file1);
+        print("Invalid file name\n") unless ( defined $file1 && -r $file1 );
+        next unless ( defined $file1 && -r $file1 );
+        my @filenames = `cat $file1`;
+        foreach my $fileinfile (@filenames) {
+            print $fileinfile;
+            chomp($fileinfile);
+            &gb2gor($fileinfile);
+        }
+        &gornex(@gofiles);
+    }
+    if ( $choice == 5 ) {
+
+    	# Reads all gene oreder files lissted in the input file and creates a matrix
+        print "Enter name of file containing .go file names\n";
+        my $file3 = <STDIN>;
+        chomp($file3);
+        print("Invalid file name\n") unless ( defined $file3 && -r $file3 );
+        next unless ( defined $file3 && -r $file3 );
+        my @tempgo = `cat $file3`;
+        foreach my $tempgo (@tempgo) {
+            chomp($tempgo);
+        }
+        push( @gofiles, @tempgo );
+        my $no_files = @gofiles;
+        if ( $no_files > 1 ) {
+            &gornex(@gofiles);
+        }
+        else {
+            print " Atleast 2 sequences are required for the matrix";
+        }
+    }
+    if ( $choice == 6 ) {
+
+	# Converts  files in master format, listed in iput file, to gene order format and creates matrix
+        print "Enter name of file containing .mf file names\n";
+        my $file3 = <STDIN>;
+        chomp($file3);
+        print("Invalid file name\n") unless ( defined $file3 && -r $file3 );
+        next unless ( defined $file3 && -r $file3 );
+        my @tempgo = `cat $file3`;
+        foreach my $fileinfile (@tempgo) {
+            print $fileinfile;
+            chomp($fileinfile);
+            &mf2gor($fileinfile);
+        }
+        &gornex(@gofiles);
+
+    }
+    if ( $choice == 7 ) {
+        print "\nMake sure your genbank files have extension .gbk, the gene order files have extension .go and the master files have extension .mf";
+        print "\nEnter the name of the file containing list of files to analyse: ";
+        my $filename = <STDIN>;
+        chomp($filename);
+        open( IN, "<$filename" );
+        my @filearray1 = <IN>;
+        my $i;
+        for $i ( 0 .. $#filearray1 ) {
+            print "$filearray1[$i]";
+            chomp( $filearray1[$i] );
+            my $ext = substr(
+                $filearray1[$i],
+                index( $filearray1[$i], "." ),
+                length( $filearray1[$i] )
+            );
+            print("$ext\n");
+            if ( $ext =~ /gbk/ ) {
+                &gb2gor( $filearray1[$i] );
+            }
+            elsif ( $ext =~ /go/ ) {
+                push( @gofiles, $filearray1[$i] );
+            }
+            elsif ( $ext =~ /mf/ ) {
+                &mf2gor( $filearray1[$i] );
+            }
+            else {
+                print "\n Invalid file name: $_ \n Press 1 to make matrix without this file\n Press 2 to return to main menu\n";
+                my $c = <STDIN>;
+                if ( $c == 2 ) {
+                    $choice = -1;
+                    last;
+                }
+            }
+        }
+        gornex(@gofiles);
+    }
+    if ( $choice == 8 ) {
+
+        # Creates a matrix of all files in memory
+        my $l = @gofiles;
+        if ( $l > 0 ) {
+            &gornex(@gofiles);
+        }
+        else {
+            print "No files in memory\n Returning to main menu\n";
+        }
+    }
+    if ( $choice == 9 ) {
+
+        # This option deletes everything in memory to enable a new analysis
+        print("\nThis will enable you to perform analysis with an entirely new set of sequences.\n
+	It erases all previous information.\nWhat do you want to do?\n(1) New Analysis\n
+	(2) Add a sequence to already existing set of sequences\n(3) Add a set of sequences to the existing set of sequences\n"
+        );
+        my $c = <STDIN>;
+        chomp($c);
+        if ( $c == 1 ) {
+            my @tempgo = qw//;
+            @gofiles = @tempgo;
+            print("Done! Proceed to load new file(s) using main menu\n\n");
+        }
+        elsif ( $c == 2 ) {
+            print("Please choose option 1 in the next menu\n\n");
+        }
+        elsif ( $c == 3 ) {
+            print("Please choose option 2 in the next menu\n\n");
+        }
+        else {
+            print("\nThat is an invalid choice.Returning to main menu.\n\n");
+            $choice = -1;
+        }
+    }
+
+}
+exit;
+############################### Message for Menu #################################
+sub message {
+    print "Welcome! Please select your input \n";
+    print "(1) a genbank file \n";
+    print "(2) a gene order file \n";
+    print "(3) a  master file \n"; 
+    print "(4) a list of genbank files \n";
+    print "(5) a list of gene order files\n";
+    print "(6) a list of master files \n";
+    print "(7) a list of files in different formats\n";
+    print "(8) all files in memory\n\n";
+    print "Or use the following options: \n";
+    print "(9) I want to create a new matrix\n";
+    print "(0) I am done\n";
+    my $choice = <STDIN>;
+    chomp($choice);
+    return $choice;
+}
+
+############################### Conversion of master files to gene order files #####################
+# uses the pepper program to read master files and convert them into a pepper output
+# code then reads this output and constructs a gene order
+
+sub mf2gor {
+    my $filename = $_[0];
+    chomp($filename);
+    my $fname  = substr( $filename, 0, index( $filename, "." ) );
+    my @args   = ( "-p", "-r", "-ti", "-o $fname.pep", "-P", $filename );
+    system( $PEPPER, @args ) and &clean_die("Command $PEPPER @args failed");
+
+    my $no_trns    = 0;
+    my @pepcontent = `cat $fname.pep`;
+    my $p          = @pepcontent;
+    my $i;
+    my $start;
+    my $end;
+    my $gene_name;
+    my $gene_order;
+
+    for ( $i = 0 ; $i < $p ; $i++ ) {
+        if ( ( $pepcontent[$i] =~ /\>/ ) && ( $pepcontent[$i] !~ /^[;]/ ) ) {
+            my $index = index( $pepcontent[$i], ".mf" );
+            my $rindex = rindex( $pepcontent[$i], ";" );
+            $gene_name =
+              substr( $pepcontent[$i], $index + 3, $rindex - $index - 3 );
+            $gene_name =~ s/\s*//;
+            if ( $gene_name =~ /->/ ) {
+                print "Found error\n";
+            }
+            elsif ( $gene_name =~ /\(/ ) {
+                if (   ( $gene_name =~ /trnI\(cau\)/ )
+                    || ( $gene_name =~ /trnL/ )
+                    || ( $gene_name =~ /trnR\(ucu\)/ )
+                    || ( $gene_name =~ /trnS/ ) )
+                {
+                }
+                elsif ( $gene_name =~ /trnM/ ) {
+                    if ( $gene_name !~ /e/ ) {
+                        $gene_name = substr(
+                            $gene_name,
+                            index( $gene_name, "(" ) - 4,
+                            index( $gene_name, "(" )
+                        );
+                    }
+                }
+                else {
+                    $index = index( $gene_name, "(" );
+                    $gene_name = substr( $gene_name, 0, $index );
+                    $gene_name =~ s/\(//;
+                }
+            }
+
+            $index = index( $pepcontent[$i], "[", 0 );
+            my $num1   = length( $pepcontent[$i] ) - $index;
+            my $num    = substr( $pepcontent[$i], $index, $num1 );
+            my $index2 = index( $num, "-" );
+            $start = substr( $num, 1,           $index2 - 1 );
+            $end   = substr( $num, $index2 + 1, length($num) );
+            $end   = substr( $end, 0,           length($end) - 2 );
+            if ( !( $gene_name =~ /\s/ ) ) {
+                $gene_name .= " ";
+            }
+            if ( $start < $end ) {
+                $gene_order .= "+" . $gene_name;
+            }
+            else {
+                $gene_order .= "-" . $gene_name;
+            }
+        }
+        $start     = 0;
+        $end       = 0;
+        $gene_name = "";
+    }
+    my $problems = "";
+    &ChkOrder( $gene_order, \$problems ) unless $no_trns;
+    $gene_order =~ s/[\+-]trn\S+\s?//g if $no_trns;
+    my $all_boundaries = GetBoundaries( $gene_order, \$problems );
+
+    #  my $filename = $fname . ".go";
+    # $filename = "CHECK_" . $filename if ($problems);
+
+    #$filename=~s/\..*//;
+    $fname .= ".go";
+    open( OUT, ">$fname" );
+    print OUT ";; Gene order file from master file\n";
+    print OUT ";; $filename\n";
+    print OUT ";; This is the gene order\n";
+    print OUT "$gene_order";
+
+    #print OUT ";; Gene boundaries\n";
+    #print OUT "$all_boundaries";
+    close(OUT);
+    push( @gofiles, $fname );
+
+}
+
+sub clean_die {
+    my $err_mess = join( "", @_ );
+
+    &cleanup;
+    die "$err_mess. Aborting.\n";
+}
+
+##############################################Conversion of genbank files to gene order files ################
+sub gb2gor {
+    use Bio::Tools::GFF;
+    use Bio::SeqIO;
+    require "ogmp/gene_names.pl";
+    my $progress = "";
+    my $no_trns  = 0;
+    for ( ; ; ) {
+
+        my $fname = $_[0];
+        last unless defined($fname);
+        die("must define a valid seqfile to read")
+          unless ( defined $fname && -r $fname );
+        my $seqio = new Bio::SeqIO(
+            -format => 'genbank',
+            -file   => $fname
+        );
+        my $count = 0;
+        while ( my $seq = $seqio->next_seq ) {
+            $count++;
+            $fname =~ s/(.+)\.gbk/$1/;
+            my $gffout = new Bio::Tools::GFF(
+                -file        => ">$fname.temp",
+                -gff_version => 2
+            );
+
+            foreach my $feature ( $seq->top_SeqFeatures() ) {
+                $gffout->write_feature($feature);
+            }
+
+            my $problems = "";
+            my $gene_order = GetOrder( $fname, \$problems );
+            ChkOrder( $gene_order, \$problems ) unless $no_trns;
+            $gene_order =~ s/[\+-]trn\S+\s?//g if $no_trns;
+            my $all_boundaries = GetBoundaries( $gene_order, \$problems );
+            my $filename = $fname . ".go";
+            $filename = "CHECK_" . $filename if ($problems);
+
+            #	$problems=~s/\n/\t/;
+            push( @gofiles, $filename );
+            open( OUT, ">$filename" )
+              or die "Can't write to \"$filename\": $!\n";
+
+            print OUT ";; The following problems were encountered:\n"
+              if ($problems);
+            print OUT ";; $problems;;\n" if ($problems);
+            print OUT ";; This is the gene order for the gbk sequence $fname\n";
+            print OUT "$gene_order\n";
+            print OUT
+";; These are the gene boundaries for the gbk sequence $fname\n;;\n";
+            print OUT "$all_boundaries\n";
+            close(OUT) or die "Can't close  $filename: $!";
+            $progress = $progress . ".";
+            print "$progress\n";
+            shift;
+        }
+        print "\nDone! Created gene order file for file ";
+        print $fname. ".gbk\n";
+
+    }
+############################ ChKOrder checks gene order from conversion of genebank file to gene order file ################################
+
+    sub ChkOrder {
+        my ( $gene_order, $problemsref ) = @_;
+        my %valid_genes = (
+            atp6       => 0,
+            atp8       => 0,
+            atp9       => 0,
+            cob        => 0,
+            cox1       => 0,
+            cox2       => 0,
+            cox3       => 0,
+            nad1       => 0,
+            nad2       => 0,
+            nad3       => 0,
+            nad4       => 0,
+            nad4L      => 0,
+            nad5       => 0,
+            nad6       => 0,
+            rnl        => 0,
+            rns        => 0,
+            trnA       => 0,
+            trnC       => 0,
+            trnD       => 0,
+            trnE       => 0,
+            trnF       => 0,
+            trnG       => 0,
+            trnH       => 0,
+            trnI       => 0,
+            trnI_cau   => 0,
+            trnK       => 0,
+            trnL_uaa   => 0,
+            trnL_uag   => 0,
+            trnM       => 0,
+            trnM_cau_e => 0,
+            trnN       => 0,
+            trnQ       => 0,
+            trnP       => 0,
+            trnR       => 0,
+            trnR_ucu   => 0,
+            trnS_gcu   => 0,
+            trnS_uga   => 0,
+            trnT       => 0,
+            trnV       => 0,
+            trnW       => 0,
+            trnY       => 0,
+        );
+        my @gene_order = split( / /, $gene_order );
+        my $gene;
+        foreach $gene (@gene_order) {
+            $gene =~ s/^\W(\S+)/$1/;
+            if ( $gene =~ /\(\S+\)/ ) {
+                $gene =~ s/(\w+)\((\w+)\)/$1_$2/;     #get rid of the brackets
+                $gene =~ s/(\w+_\w\w\w)(\w)/$1_$2/;
+            }
+            if ( defined( $valid_genes{$gene} ) ) { $valid_genes{$gene} += 1; }
+            else { $$problemsref = $$problemsref . "\n;;Unusual gene: $gene"; }
+        }
+        foreach $gene ( keys(%valid_genes) ) {
+            unless ( $gene =~ /trnI_cau|trnM_cau_e|trnR_ucu|atp9/ )
+            {    #These genes are "optional" for animal mtDNA
+                $$problemsref =
+                  $$problemsref
+                  . "\n;;Gene $gene is present $valid_genes{$gene} times"
+                  if ( $valid_genes{$gene} != 1 );
+            }
+        }
+        return;
+    }
+###################### GetOrder gets the gene order from a gff file obtained from inout genbank file ####################################
+
+    sub GetOrder {
+
+        # This subroutine determines gene order from a GFF2 file
+        my $fname       = $_[0];
+        my $problemsref = $_[1];
+        my $TYPE        = 2;
+        my $POLARITY    = 6;
+        my $GENENAMES   = 8;
+        my $line;
+
+        open( IN, "<$fname.temp" ) || die "Can't read from \"$fname\": $!\n";
+        my @features = <IN>;
+        close(IN) or die "Can't close $fname: $!\n";
+
+        my $gene_order = "";
+        foreach $line (@features) {
+            next if ( $line !~ /^SEQ/ );
+            chomp $line;
+            my @fields = split( /\t/, $line );
+            grep( s/^\s+// && 0, @fields );    # Remove leading spaces
+            grep( s/\s+$// && 0, @fields );    # Remove trailing spaces
+               #grep(s/^-$//  && 0,@fields);  # Replace hashes by empty strings.
+            next if ( $fields[$TYPE] !~ /CDS|rRNA|tRNA/i );
+
+#next if ($fields[$TYPE] eq "gene")  && ($fields[$GENENAMES] =~ /(trn.)\(...\)|rns|rnl/);
+#This is a very rough translation for problematic genes; all other genes are handled by gene_names2 file
+            if ( $fields[$TYPE] eq "rRNA" ) {
+                $fields[$GENENAMES] = "rns"
+                  if ( $fields[$GENENAMES] =~ /small|12S|s-rRNA/i );
+                $fields[$GENENAMES] = "rnl"
+                  if ( $fields[$GENENAMES] =~ /large|16S|l-rRNA/i );
+            }
+            elsif ( $fields[$TYPE] eq "tRNA" ) {
+                if ( $fields[$GENENAMES] =~ /trnI\(cau\)/ ) {
+                    $fields[$GENENAMES] = "trnI(cau)";
+                }
+                elsif ( $fields[$GENENAMES] =~ /trnL|tRNA-Leu|tRNA(L)/ ) {
+                    print "$fields[$GENENAMES]\n";
+                    $fields[$GENENAMES] = "trnL(" . "$1)"
+                      if ( $fields[$GENENAMES] =~
+                        /codons recognized:\s+(\w\w\w)/i );
+                    $fields[$GENENAMES] = "$1"
+                      if ( $fields[$GENENAMES] =~ /gene \"(trnL\(\w\w\w\))\"/ );
+                }
+                elsif ( $fields[$GENENAMES] =~ /trnM\(cau\)e/ ) {
+                    $fields[$GENENAMES] = "trnM(cau)e";
+                }
+                elsif ( $fields[$GENENAMES] =~ /trnR\(ucu\)/ ) {
+                    $fields[$GENENAMES] = "trnR(ucu)";
+                }
+                elsif ( $fields[$GENENAMES] =~ /trnS|tRNA-Ser|tRNA(S)/ ) {
+                    $fields[$GENENAMES] = "trnS(" . "$1)"
+                      if ( $fields[$GENENAMES] =~
+                        /codons recognized:\s+(\w\w\w)/i );
+                    $fields[$GENENAMES] = "$1"
+                      if ( $fields[$GENENAMES] =~ /gene \"(trnS\(\w\w\w\))\"/ );
+                }
+                else {
+                    $fields[$GENENAMES] = "$1"
+                      if ( ( $fields[$GENENAMES] =~ /(trn.)\(...\)/ )
+                        || ( $fields[$GENENAMES] =~ /(tRNA-...)/ ) );
+                }
+            }
+            elsif ( $fields[$TYPE] eq "CDS" ) {
+                $fields[$GENENAMES] = "$1"
+                  if ( $fields[$GENENAMES] =~ /gene (\w+)/ );
+            }
+
+            my $gname  = $fields[$GENENAMES];
+            my $strand = $fields[$POLARITY];
+            if ( &GENE_NAMES($gname) ) {
+                $gname = &GENE_NAMES($gname);
+            }
+            else {
+                $$problemsref =
+                  $$problemsref . "\n;;Could not figure out this gene: $gname!";
+            }
+            $gene_order = $gene_order . $strand . $gname . " ";
+        }
+        return $gene_order;
+    }
+
+################## Generates gene boundaries from gene orders ####################################
+
+    sub GetBoundaries {
+
+# This subroutine lists and reformats (if needed) all gene boundaries for a given gene order
+        my $gene_order     = $_[0];
+        my $problemsref    = $_[1];
+        my @all_genes      = split( / /, $gene_order );
+        my $gene_boundary  = "";
+        my $all_boundaries = "";
+        my $upstream_gene  = "";
+        my $gene;
+
+        foreach $gene (@all_genes) {
+            if ($upstream_gene) {
+                $gene_boundary = $upstream_gene . $gene;
+            }
+            else {
+                $gene_boundary = $all_genes[$#all_genes]
+                  . $gene;    #last gene - first gene boundary
+            }
+            $gene_boundary =~
+              s/-([^-]+)-([^-]+)/+$2+$1/;    #this turns around a "-,-" boundary
+                #the following two ifs deal with +- or -+ gene boundaries
+            if ( $gene_boundary =~ /^\+([^-]+)-([^-]+)$/ ) {
+                $gene_boundary = "+$2-$1" if ( ( $1 cmp $2 ) > 0 );
+            }
+            if ( $gene_boundary =~ /^-([^\+]+)\+([^-]+)$/ ) {
+                $gene_boundary = "-$2+$1" if ( ( $1 cmp $2 ) > 0 );
+            }
+            $upstream_gene  = $gene;
+            $all_boundaries = $all_boundaries . $gene_boundary . " ";
+        }
+        return $all_boundaries;
+    }
+
+############################ Generates  and stores in nexus format, the matrix for gene order ##################################
+    sub gornex {
+
+        my @filearray = @_;
+
+        my $uphushref      = createhush(0);
+        my $downhushref    = createhush(1);
+        my @all_boundaries = ();
+        my ( $gorfile, $genepair, $taxlabels );
+
+        #my $outfile = "gorder.dat";
+        my $i;
+        my $pointer = 0;
+        for $i ( 0 .. $#filearray )
+        {    #Read files from @ARGV extract gene arrangement from them;
+            $gorfile = $filearray[$i];
+            my ( $line, $line1, $boundary );
+            my @gene_boundaries;
+            open( IN, "<$gorfile" ) || die "Can't read from \"$gorfile\": $!\n";
+            while (<IN>) {
+                if ( $_ =~ /boundaries/ ) {
+                    $pointer = 1;
+                }
+                next if /^;/;
+                chomp( $line1 = $_ );
+                last;
+            }
+            close(IN) or die "Can't close $gorfile $!\n";
+
+            #make species name
+            my @gene_pairs;
+            $gorfile =~ s/^[^_]+_([^_]{1,5})[^_]*_([^_]{1,4}).*/$1_$2/;
+            if ( $pointer == 0 ) {
+                $line = &GetBoundaries($line1);
+                @gene_pairs = split( / /, $line );
+            }
+            elsif ( $pointer == 1 ) {
+                @gene_pairs = split( / /, $line1 );
+            }
+
+          #open(OUT, ">>$outfile") or die "Can't write to \"gorder.dat\": $!\n";
+            foreach $genepair (@gene_pairs) {
+                my ( $sign1, $gene1, $sign2, $gene2 );
+                if ( $genepair =~ /^(\+|-)(.+)(\+|-)(.+)$/ ) {
+                    ( $sign1, $gene1, $sign2, $gene2 ) =
+                      ( $genepair =~ /^(\+|-)(.+)(\+|-)(.+)$/ );
+                    $gene1 =~ s/(\w+)\((\w+)\)/$1_$2/
+                      if ( $gene1 =~ /\(\S+\)/ );    #get rid of the brackets
+                    $gene2 =~ s/(\w+)\((\w+)\)/$1_$2/
+                      if ( $gene2 =~ /\(\S+\)/ );    #get rid of the brackets
+                }
+                if ( $sign1 eq "+" && $sign2 eq "+" ) {
+                    $gene_boundaries[ $downhushref->{$gene1} ] =
+                      "5-$gene2";                    #$uphushref->{$gene2};
+                    $gene_boundaries[ $uphushref->{$gene2} ] =
+                      "3-$gene1";                    #$downhushref->{$gene1};
+                }
+                elsif ( $sign1 eq "-" && $sign2 eq "+" ) {
+                    $gene_boundaries[ $uphushref->{$gene1} ] = "5-$gene2"
+                      ; #$uphushref->{$gene2}; #we will have to use table 2 for the other strand genes
+                    $gene_boundaries[ $uphushref->{$gene2} ] =
+                      "5-$gene1";    #$uphushref->{$gene1};
+                }
+                elsif ( $sign1 eq "+" && $sign2 eq "-" ) {
+                    $gene_boundaries[ $downhushref->{$gene1} ] =
+                      "3-$gene2";    #$downhushref->{$gene2};
+                    $gene_boundaries[ $downhushref->{$gene2} ] =
+                      "3-$gene1";    #$downhushref->{$gene1};
+                }
+            }
+            $taxlabels .=
+              "\t\'$gorfile\'\n";    # unshift @gene_boundaries, "$gorfile";
+            $all_boundaries[$i] = [@gene_boundaries];
+        }
+        my ( $arrayref, $statelabels ) = convert_table( \@all_boundaries );
+        @all_boundaries = @$arrayref;   #I recicle @all_boundaries for new table
+
+        #output
+        print "Name output file [gorder.dat] ? If no, enter file name:";
+        my $outfile = <STDIN>;
+        chomp($outfile);
+        if ( $outfile eq "" ) {
+            $outfile = "gorder.dat";
+        }
+        my $ntax = @gofiles;
+
+        #remove old output file (if exists)
+        if ( -e $outfile ) {
+            print "Rewriting file \"$outfile\"!\n";
+        }
+        open( OUT, ">$outfile" ) || die "Can't write to \"$outfile\": $!\n";
+        print OUT "#NEXUS
+begin data;
+dimensions ntax = $ntax  nchar = 82;
+FORMAT MISSING=?  TRANSPOSE  SYMBOLS= \" A B C D E F G H I J K L M N O P Q R S T U V W X Y Z\";
+TAXLABELS
+$taxlabels\n;
+STATELABELS
+$statelabels
+;
+MATRIX\n";
+        my @all_genes = sort ( keys %$uphushref );
+        push @all_genes, @all_genes;
+        for $i ( 0 .. $#all_boundaries ) {
+            $arrayref = $all_boundaries[$i];
+            my $gene = shift(@all_genes);
+            if   ( $i < 41 ) { print OUT "$gene" . "_>\t@$arrayref\n"; }
+            else             { print OUT "<_$gene\t@$arrayref\n"; }
+        }
+        print OUT ";\nend;\n";
+        close(OUT) or die "Can't close \"$outfile\": $!\n";
+        print "Done!\n";
+
+        #This routine creates a lookup table and returns a reference to it
+        sub createhush {
+            my $downhash = shift(@_);
+            my $addme    = $downhash ? 0 : 41;
+            my $retref   = {
+                atp6      => 0 + $addme,
+                atp8      => 1 + $addme,
+                atp9      => 2 + $addme,
+                cob       => 3 + $addme,
+                cox1      => 4 + $addme,
+                cox2      => 5 + $addme,
+                cox3      => 6 + $addme,
+                nad1      => 7 + $addme,
+                nad2      => 8 + $addme,
+                nad3      => 9 + $addme,
+                nad4      => 10 + $addme,
+                nad4L     => 11 + $addme,
+                nad5      => 12 + $addme,
+                nad6      => 13 + $addme,
+                rnl       => 14 + $addme,
+                rns       => 15 + $addme,
+                trnA      => 16 + $addme,
+                trnC      => 17 + $addme,
+                trnD      => 18 + $addme,
+                trnE      => 19 + $addme,
+                trnF      => 20 + $addme,
+                trnG      => 21 + $addme,
+                trnH      => 22 + $addme,
+                trnI      => 23 + $addme,
+                trnI_cau  => 24 + $addme,
+                trnK      => 25 + $addme,
+                trnL_uaa  => 26 + $addme,
+                trnL_uag  => 27 + $addme,
+                trnM      => 28 + $addme,
+                trnM_caue => 29 + $addme,
+                trnN      => 30 + $addme,
+                trnP      => 31 + $addme,
+                trnQ      => 32 + $addme,
+                trnR      => 33 + $addme,
+                trnR_ucu  => 34 + $addme,
+                trnS_gcu  => 35 + $addme,
+                trnS_uga  => 36 + $addme,
+                trnT      => 37 + $addme,
+                trnV      => 38 + $addme,
+                trnW      => 39 + $addme,
+                trnY      => 40 + $addme,
+            };
+            return $retref;
+        }
+
+        sub convert_table {
+
+# converts the table so that the character states for each position are in array
+# character states are renamed as capital letters A-Z
+# returns an array containing references to arrays for each position
+            my $arrayref = shift(@_);
+            my ( @LoL_old, @LoL_new, @char_states, $aref, $key, $statelabels,
+                $i, $j );
+            @LoL_old = @$arrayref;
+            for $j ( 0 .. 81 ) {
+                for $i ( 0 .. $#LoL_old ) {
+                    $aref = $LoL_old[$i];
+                    $char_states[$i] = shift @$aref;
+                }
+                my $ascii       = 65;
+                my %used_states = ();
+                for $i ( 0 .. $#char_states ) {
+                    if ( defined $char_states[$i] ) {
+                        if ( defined $used_states{ $char_states[$i] } ) {
+                            $char_states[$i] = $used_states{ $char_states[$i] };
+                        }
+                        else {
+                            $used_states{ $char_states[$i] } = chr($ascii);
+                            $char_states[$i] = chr($ascii);
+                            $ascii++;
+                        }
+                    }
+                    else { $char_states[$i] = "?"; }
+                }
+                $statelabels .= $j + 1 . " ";
+                foreach $key (
+                    sort { $used_states{$a} cmp $used_states{$b} }
+                    keys %used_states
+                  )
+                {
+                    $statelabels .= "\'$key\' ";
+                }
+                $statelabels .= ",\n";
+                $LoL_new[$j] = [@char_states];
+            }
+            return ( \@LoL_new, $statelabels );
+        }
+    }
+}

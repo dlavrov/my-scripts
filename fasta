@@ -1,0 +1,112 @@
+#!/bin/sh
+# fasta script for Sun
+#
+# Tim, 01DEC93
+#
+
+echo
+echo This is the OGMP version of fasta
+echo
+
+
+# Variables
+SEQBANKS=/research/seqbanks
+BASENAME=`basename "$0"` #fasta
+
+if [ $# -lt 2 ] ; then
+    echo "Usage: $BASENAME file|library file|library"
+    exit 20
+fi
+
+# see if the -o [order] flag was provided; if so, use it!
+if [ "$1" = "-o" ] ; then
+    FASTA='/usr/local/bin/fasta/fasta36 -o'
+    shift
+elif [ "$1" = "-g" ] ; then
+    FASTA='/usr/local/bin/fasta/ggsearch36'
+    shift
+else
+    FASTA='/usr/local/bin/fasta/fasta36'
+fi
+
+# See where the files are and invoke fasta accordingly
+if [ -f "$1" -a -f "$2" ] ; then
+    SECONDLIB=`expr $2 : '.*'` #my fix of 'expr length $2'
+	echo "TEST $SECONDLIB"
+    if [ $SECONDLIB = "1" ] ; then
+        echo "As $2 is only one character, assuming it is specified in fastgbs"
+        echo "i.e. NOT using the $PWD copy of $2"
+        echo
+        $FASTA "$1" "$2"
+    else
+        echo "Using both $1 and $2 from $PWD not $SEQBANKS."
+        echo ""
+    fi
+
+    # Evaluate the return of chkogmp to check the accuracy of the data entry!
+    # use the -f option because fasta is used on masterfiles, compl/nocompl, etc
+    chkogmp -f "$1" >/dev/null 2>/dev/null
+    CHECK1=$?
+    if [ $CHECK1 -eq 3 ] ; then
+        echo "file $1 does not pass chkogmp"
+        echo "Try running cleanogmp and rerun $BASENAME"
+        exit
+    fi 
+
+    $FASTA "$1" "$2" 	# Both files $1 and $2 found in pwd and are ok
+
+elif [ -f "$1" ] ; then			# Only file $1 found
+    if [ -f $SEQBANKS/"$2" ] ; then 	# check to see if it exists or is a library
+    	echo "Using $1 from $PWD and $2 from $SEQBANKS."
+    	echo ""
+
+        chkogmp -m "$1" >/dev/null 2>/dev/null
+        CHECK1=$?
+        if [ $CHECK1 -eq 3 ] ; then
+           echo "file $1 does not pass chkogmp"
+           echo "Try running cleanogmp and rerun $BASENAME"
+           exit
+        fi
+
+        $FASTA "$1" $SEQBANKS/"$2"    	# file $2 found in seqbanks- use it
+    else
+        echo "file $1 found in $PWD but"
+	echo "file $2 not found in $SEQBANKS or in $PWD"
+	SECONDLIB=`expr $2 : '.*'`
+    if [ $SECONDLIB = "1" ] ; then
+	echo "As $2 is only one character, assuming it is specified in fastgbs"
+	$FASTA "$1" "$2"
+    fi
+fi
+
+elif [ -f "$2" ] ; then
+    if [ -f $SEQBANKS/"$1" ] ; then 		# check to see if it exists or is a library
+    echo "Using $2 from $PWD and $1 from $SEQBANKS."
+    	echo ""
+
+    	$FASTA $SEQBANKS/"$1" "$2"
+    else
+    	echo "file $2 found in $PWD but"
+    	echo "file $1 not found in $SEQBANKS or in $PWD"
+    fi
+else
+    if [ -f $SEQBANKS/"$1" -a  -f $SEQBANKS/"$2" ] ; then
+    	echo "Using both $1 and $2 from $SEQBANKS."
+    	echo ""
+    	$FASTA $SEQBANKS/"$1" $SEQBANKS/"$2"
+    elif [ -f $SEQBANKS/"$1" -a ! -f $SEQBANKS/"$2" ] ; then
+    	echo "file $1 found in $SEQBANKS but"
+    	echo "file $2 not found in $SEQBANKS or in $PWD"
+    	SECONDLIB=`expr : $2 '.*'`
+    	if [ $SECONDLIB = "1" ] ; then
+    		echo "As $2 is only one character, assuming it is specified in fastgbs"
+    		$FASTA $SEQBANKS/"$1" "$2"
+    	fi
+    elif [ -f $SEQBANKS/"$2" -a ! -f $SEQBANKS/"$1" ] ; then
+       	echo "file $2 found in $SEQBANKS but"
+    	echo "file $1 not found in $SEQBANKS or in $PWD"
+    else
+    	echo "Neither file $1 and $2 could be found in either"
+    	echo "$PWD or $SEQBANKS."
+    fi
+fi

@@ -1,0 +1,785 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                  aligner                                  #
+$VERSION=                       "version 1.1"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 02/13/2002,                          #
+#############################################################################
+
+############## TO DO LIST ################
+# list all variables                     #
+# change array to hash in runclustal     #
+# to be sure that you concatenate the same species  #
+# add log output at the beginning        #
+##########################################
+
+
+# Perl libraries.
+require "ogmp/subarray.pl";
+#require "/usr/bin/subarray.pl";
+#require "./subarray.pl";
+use File::Copy;
+
+my $choice = 0;
+my $i = 0;
+#librairie
+my $libpath = "/research/seqlib/lib/";
+my $peppath = "/research/seqlib/pepfiles/";
+# Main program
+
+print "\nWelcome to soapalign!\n";
+CheckSauve();
+CheckSauve2();
+AddGenes();
+
+# Menu
+while ($choice != 1 || $choice != 2 || $choice != 3 || $choice != 4 || $choice !=5 || $choice !=6) {
+
+print 	"\nWhat do you want to do?\n
+(1) Add a new species
+(2) Create new libraries
+(3) Run clustalw
+(4) Filter out variable regions
+(5) List missing proteins
+(6) Exit the program\n\n";
+
+$choice = <STDIN>;
+
+if ($choice == 1) {
+$n=0;
+	use File::Copy;
+        if(!copy("./species.list","./sauveguard/species1.list")){
+		        print "Erreur dans la copie:$!\n";
+			                               }
+		unlink "species.list";		 
+		GetPepper1();
+		$new_species = AddSpecies();
+		UpdateList($new_species);
+        	CheckLibs();        
+		}
+
+elsif ($choice == 2) {
+		Remove ();
+		GeneFile();
+		Create ();
+		CheckLibs();
+		}
+
+elsif ($choice == 3) {
+		CheckLibs();
+		GetSeqs();
+		CheckFiles();
+                RunClustal();
+		Missing();	
+		}
+		
+elsif ($choice == 4) {
+	        filtre();     
+			
+	}
+
+elsif ($choice == 5) {
+		Missing();
+		}
+
+elsif ($choice == 6) {
+		exit;
+                }
+
+else {print "$choice is not a valid option!"};
+} # End of while loop
+# End of program
+
+#
+# Subroutine
+#============================================
+sub Remove {
+	
+	#efface les species.list et les fichiers *.seq present dans le repertoire lib
+	use File::Copy;
+	#if(!copy("./species.list","./sauveguard/species1.list")){
+	#print "Erreur dans la copie:$!\n";
+	#                       }
+	unlink "species.list";
+	unlink $libpath."species.list";
+	unlink <$libpath*.seq>;
+	
+	#recree le fichier species.list de lib
+	$lib = "species.list";
+	      open (OUT,">$libpath$lib")or die "Can't open the file $libpath$lib:$!\n";
+	      close (OUT)or die "Can't close $libpath$lib:$!\n";
+	}
+	
+#===============================================
+#cette subroutine sert a produire les meme resultats que le choix 1
+#mais elle fait ceci pour chaque fichier .pep contenues dans le repertoire courant
+#ceci est possible grace a la boucle fort
+sub Create {
+	
+	$n=0;
+	@files = <$peppath*.pep>;        
+
+	for($n=0;$n<@files;$n++){
+		        GetPepper2();                
+			$new_species = AddSpecies();
+			UpdateList($new_species);
+	}
+}
+#============================================
+#cette subroutine cree le tableau @genename a partir des genes ecrit dans le fichier genes.list
+sub AddGenes {
+
+	open(IN,$libpath."genes.list") or die "Can't read from \"genes.list\": $!\n";
+	
+	while ($line = <IN>) {
+		
+	chomp($line);			#extrait le gene de gene.list
+	if ($line =~ /^(\S+)/)  {	#elimine les lignes vides
+	push @genename, $line;  	#met le gene dans genename
+		}       
+	}
+	close(IN) or die "Can't close \"genes.list\": $!";
+}
+#===========================================
+sub GeneFile {
+	
+	#cree les fichiers .seq necessaire dans le repertoire lib
+	foreach $gene (@genename){
+		open (OUT,"+>$libpath$gene.seq")or die "Can't open the file $gene.seq :$!\n";
+		close (OUT) or die "Can't close the file $gene :$!\n";
+		}
+}
+#============================================
+sub GetPepper2 {
+
+	@files = <$peppath*.pep>;
+	$datafile = $files[$n];
+	#ouvre tour a tour les fichiers .pep et copie les donnees necessaires.
+	($datafile, @new_pepper) = &Open_a_file2($datafile, 'pepper .pep file');
+	print "Check datafile: $datafile\n";
+	@new_pepper = grep !/^;/,@new_pepper;
+}
+#===========================================
+sub GetPepper1 {
+	#meme fonction que GetPepper2 mais pour un seul fichier .pep
+	@files = <*.pep>;
+	$datafile = $files[$n];
+	#get pepper .pep file
+	($datafile, @new_pepper) = &Open_a_file1($datafile, 'pepper .pep file');
+	print "Check datafile: $datafile\n";
+	@new_pepper = grep !/^;/,@new_pepper;       #remove comment line
+}
+#===========================================
+  sub AddSpecies {
+# This subroutine adds nes sequences from a fasta file created by pepper
+	local $filename = "";
+	@files = <$peppath*.pep>;
+        local $old_species = "";
+        local $new_species = "";
+	
+        # Check for the species name
+	foreach $line (@new_pepper) {
+#selectionne le premier mot de toute les lignes commencant par '>'  
+            $new_species = $line if ($line =~ /^>/);
+
+	    #ces lignes servent a controler un certains format d'ecriture
+   if ($new_species=~/^>/){
+ if ($line=~/^>(\S+ \S+;)/ || $line=~/^>(\S+)$/){
+	   print $new_species; 
+    }
+}	    
+    $new_species =~ s/^>(\S{1,50}).*\n/$1/;
+#compare les mots recueillis
+	    if ($old_species && ($new_species ne $old_species)) {
+		    print "Error: The file $datafile seems to contain data for more than one species: ($old_species and $new_species)\n";
+		     return;
+		            }
+            $old_species = $new_species;
+            }
+	    
+	#  Extract the sequence for each gene
+	FILE: for ($i=0; $i<@genename; $i++) {
+		$filename = $libpath . $genename[$i] . ".seq";
+		#ouvre les fichiers .seq contenus dans libraries
+                open(IN, "$filename") or die "Can't read $filename: if it's the first time you use aligner: Please start with choice 2.\n Else you've got a probleme.\n";
+                @library_file = <IN>;#remplie le tableau @library_file
+                close(IN) or die "Can't close $filename: $!\n";
+               
+                # check if the sequence is already exist
+                foreach $line (@library_file) {
+			if ($line =~ /^>$new_species/) {
+				print "Warning: Species $new_species is already present in file $filename!  Ignored.\n";
+				next FILE;
+                        }
+                    }
+		    #examine la variable $genename pour savoir quels gene doivent etre extrait du fichier.pep
+                $string = " ".$genename[$i]." "; 
+		@current_gene=&ExtractSubArray("^>.*$string",'^$',\@new_pepper,"extract","");
+	#si le gene est present il est extrait et introduit dans la librairie portant son nom 
+		if ($#current_gene > 0) {
+                    foreach $line (@current_gene) {
+                        push @library_file, $line;
+                        }
+                    
+                    $flat_file = join '',@library_file;
+                    @library_file = split />/, $flat_file;	#decoupe la liste a chaque ">"
+		    @library_file = sort by_lc @library_file;	#classe la liste par ordre alphabetique
+                    $flat_file = join '>', @library_file;
+		    open (OUT, ">$filename") or die "Can't write to $filename: $!\n";
+                    print OUT $flat_file;			#ecrit la liste
+		    close (OUT) or die "Can't close $filename: $!\n";
+		}
+	  	   else {#sinon on remplace le gene manquant par une ligne (>nom_de_l'espece nom_du_gene)(!@# sert a reconnaitre la ligne par Missing)
+			$variable = ">$new_species $genename[$i] !@# ;\n*\n\n";
+			push @library_file, $variable;
+			   
+			   $flat_file = join '',@library_file;
+			   @library_file = split />/ ,$flat_file;
+			   @library_file = sort @library_file;
+			   $flat_file = join '>', @library_file;
+					    
+			open(OUT, ">$filename") or die "Can't write to $filename: $!\n";
+			print OUT $flat_file;
+			close(OUT) or die "Can't close $filename: $!";
+			}#else
+		}#for
+		
+		return $new_species;
+
+	}#sub
+#============================================
+#etablie la liste des proteines manquantes
+sub Missing {
+@userfiles = "";
+@species = " ";
+	#get the genes to use from local genes.list
+open(IN, "genes.list") or die "Can't open \"genes.list\": $!\n";
+	while ($line = <IN>) {
+		unless ($line =~ /^;/ || $line=~/^ +;/) {  # unless line starts with a semicolan
+			chomp($line);
+			 if ($line=~s/^ +(\S+)/$1/){
+				 $line=$1;
+				   }
+			if ($line =~ /^\S+/)  {
+				$line = $line . ".seq";
+        			push @userfiles, $line;
+						}					
+				}
+			}
+close(IN) or die "Can't close \"genes.list\": $!\n";
+        
+	#get the species to use from local species.list
+open(IN, "species.list") or die "Can't open \"species.list\": $!\n";
+	while ($line = <IN>) {
+		unless ($line =~ /^;/ || $line =~ /^ +;/) {
+			chomp($line);
+          	
+			
+		if ($line =~ s/^ +(\S+)/$1/){
+			                        $line=$1;
+				
+					}
+				if ($line =~ /^\S+/){
+					push @species, $line;
+		}	}
+             		}
+close(IN) or die "Can't close \"species.list\": $!\n";
+
+open (OUT, "+>Missing") or die "Can't open the file Missing: $!\n";
+foreach $species (@species){ 
+	print OUT "\n$species\n"; #write species name
+print "\n$species\n";
+	foreach $localfile (@userfiles){
+		$libfile = $libpath . $localfile;
+		open (IN, "$libfile") or die "Can't open the file $libfile: $!\n";
+		 while ($line = <IN>) {
+			if ($line =~ /^>$species/ and $line =~ /!@# ;$/){ #repere la ligne grace au cigle !@#
+				$line =~ s/^>$species (\S+)/$1/; #select genes name
+				print OUT "$1\n"; #write genes name
+	print "$1\n";
+			}
+		}
+		close (IN) or die "Can't close the file $libfile: $!\n";
+	}		
+}			
+close (OUT) or die "Can't close the file Missing: $!\n";			
+
+undef @userfiles;
+undef @species;
+
+}#sub
+#=====================================
+sub CheckFiles {  #This subroutine checks the files
+$n=0;
+foreach $file (@userfiles) {
+	@species = ("no_species",);
+	open(FILE, $file) or die "Can't open $file: $!";
+	$i=0;
+	while (<FILE>) {
+		print "$i\n";
+		chomp;
+	 
+		if (/^>/) {
+		$species[$i] = $_;
+		$species[$i] =~ s/>([^ ]+).*/$1/;
+		#verifie que les genes aligne appartiennent a la meme espece
+			if ($n > 0 && ($species[$i] ne $oldspecies[$i])) {
+				print "$species[$i] is not $oldspecies[$i]\n";
+				die("The species #$i+1 in $file is different!\n");
+			}
+		$i++;
+		}
+	}
+	@oldspecies = @species;
+	$n++;
+	}
+} #sub CheckFiles
+#============================================
+sub by_lc { 
+#This subroutine is used in sort function to ignore the case
+lc($a) cmp lc($b);
+}
+#============================================
+sub CheckSauve {
+	#verifie la presence du repertoire sauveguard
+	unless (-e "sauveguard") {
+		#cree le repertoire sauveguard s'il est absent
+	if (!-e "sauveguard") {
+   $sauveguard = "./sauveguard"; 
+ mkdir $sauveguard;
+}
+}
+}
+#===========================================
+sub CheckSauve2 {
+	        #verifie la presence du repertoire scl
+		unless (-x "/usr/local/bin/scl") {
+		print "You don't have scl progam installed in /usr/local/bin\n"; 
+		exit;
+		return;
+	}}
+#===========================================
+sub CheckLibs {
+# This routine creates file for clustalw.
+# It reads data from two datafiles: species.list and gene.list
+# If they are not present in the current directory, the two files are copied from the library
+
+#Check for the presence of files species.list and gene.list
+unless (-e "species.list" && -e "genes.list" && -e "clustal.ctl") {
+    if (!-e "species.list") {
+	    print "Can't find species.list!  Creating local copy.
+Please mark the species you want to ignore with a semicolon: ;\n";
+	    #si species.list n'est pas trouve les 3 lignes suivantes en font une copie a partir de la librairie $libpath
+        my $filename = $libpath . "species.list";
+#	print "Here is \$filename: $filename\n";
+        copy($filename, "species.list");
+        }
+    if (!-e "genes.list") {
+	    print "Can't find genes.list!  Creating local copy.\n  Please mark the genes you want to ignore with ;\n";
+	    #si gene.list n'est pas trouve les 3 lignes suivantes en font une copie
+	my $filename = $libpath . "genes.list";
+	print "Here is \$filename: $filename\n";
+	copy($filename, "genes.list");
+	        }
+	
+	if (!-e "clustal.ctl") {
+		my $filename = $libpath . "clustal.ctl";
+		print "Can't find clustal.ctl!  Creating local copy.
+        You can modify the alignment parameters, if you wish\n";
+		copy("$filename", "clustal.ctl");
+        	}
+    }
+}
+
+#============================================    
+sub GetSeqs {
+
+	$n=0;
+
+#get the genes to use from local genes.list
+open(IN, "genes.list") or die "Can't open \"genes.list\": $!\n";
+while ($line = <IN>) {
+	   unless ($line =~ /^;/ || $line=~/^ +;/) {  # unless line starts with a semicolan
+	chomp($line);
+	if ($line=~s/^ +(\S+)/$1/){
+		$line=$1;
+	}
+	if ($line =~ /^(\S+)/)  {
+	$line = $line . ".seq";
+	push @userfiles, $line;
+	}}
+}
+close(IN) or die "Can't close \"genes.list\": $!\n";
+
+#get the species to use from local species.list
+open(IN, "species.list") or die "Can't open \"species.list\": $!\n";
+while ($line = <IN>) {
+	unless ($line =~ /^;/ || $line =~ /^ +;/) {
+		chomp($line);
+                if ($line =~ s/^ +(\S+)/$1/){
+                      $line=$1;
+                          }
+                 if ($line =~ /^\S+/){
+
+	push @species, $line;
+	}
+}
+}
+close(IN) or die "Can't close \"species.list\": $!\n";
+
+print "The following species will be used in the analysis:\n";
+print "@species\n";
+
+$line = 0;
+foreach $localfile (@userfiles) {
+       print @userfiles ;
+	$libfile = $libpath . $localfile;
+        open (IN, "$libfile") or die "Can't opent the file $libfile: $!\n";
+        open (OUT, ">$localfile") or die "Can't opent the file $localfile: $!\n";
+        $in_record = 0;
+        $skip_warning = 0;
+        LINE: while ($line = <IN>) {
+		    if ($line =~ /^\s$/ && $in_record) {
+                $in_record = 0;
+                print OUT $line;
+                next LINE;
+                } 
+                
+		elsif ($in_record) {
+			
+			if ($line=~/^>/){
+				print "\n il manque un saut de ligne $line\n"; 
+			exit;	
+			}
+			print OUT $line unless ($line =~ /^;/ );
+		next LINE;
+                }
+            elsif ($line =~ /^>/) {
+                $skip_warning = 0;
+                for ($i=0; $i<@species; $i++) {
+                        if ($line =~ /^>$species[$i]/) {
+                            #print STDERR "Match! Here is the line: $line\n";
+                            print OUT $line;
+                            $in_record = 1;
+                            next LINE;
+                            }
+                        }
+			$line =~ s/^>(\w+).*$/$1/;
+			print STDERR "$line is skipped!\n";
+			$skip_warning = 1;
+                }
+		else {
+			print STDERR "Warning: Unexpected line \"$line\" in file \"$libfile\". Ignored.\n" unless ($skip_warning);
+			}
+        } #\LINE while
+    close (IN) or die "Can't close the file $libfile: $!\n";
+    close (OUT) or die "Can't close the file $localfile: $!\n";
+    } #\foreach
+} #\sub Get Seqs
+
+#============================================
+
+# This subroutine opens a file
+sub Open_a_file2 {
+	#open file
+	local($filename, $request) = @_;
+	
+	#read datafile
+	open(IN,"$filename") || die "Can't read from \"$filename\": $!\n";
+	@RET = <IN>;
+	close(IN) or die "can't close  $filename: $!";
+	return($filename, @RET);
+	}
+#==========================================
+	
+sub Open_a_file1 {
+	
+	#open file
+	local($filename, $request) = @_;
+	print "Please enter the name of the $request ($filename):\n> ";
+	chomp($answer = <STDIN>);
+	$filename = $answer if $answer;
+	
+	#read datafile
+	open(IN,"$filename") || die "Can't read from \"$filename\": $!\n";
+	@RET = <IN>;
+	close(IN) or die "can't close  $filename: $!";
+	return($filename, @RET);
+}
+#=========================================
+sub RunClustal {
+	unlink <*.pir>;
+	$n=0;
+	#the next seven lines are used to get the clustalw parameters into @parameters
+		open(IN, "clustal.ctl") or die "Can't open \"clustal.ctl\": $!\n";
+	       while ($line = <IN>) {
+			if ($line =~ /^\/outorder/) {
+			$parameters[$n] = $line;
+				$n++;
+		}#if
+		}#while
+	RunClustal0 (); 
+
+
+	unlink <*.dnd>;		#supprime les fichiers.dnd
+	#	unlink <*.seq>;
+	
+	Sauveguard();
+	Sauveguard2();
+	#les lignes suivantes font une copie des fichiers.pir dans un repertoire de sauvegarde	
+	foreach (<*.pir>){	
+			use File::Copy;
+		if(!copy("./$_","./sauveguard/$_")){
+				print "Erreur dans la copie:$!\n";
+			}	
+		}
+	
+	for ($i=0;$i<@genename;$i++){
+		unlink <$genename[$i].pir>;
+		}
+
+#system "scl -c -nexi";
+system "scl -c";
+unlink <*.pir>;
+
+}
+#============================================
+#This subroutine runs clustalw alignments with different parameters and combines all genes' alignments into
+#a single file
+
+sub RunClustal0 {
+
+	my $save_input_separator = $/;
+	my $filename;
+	my $line;
+	my @allseqs;
+	my ($i, $j, $n);
+	
+	  $/=  "*\n";# Set input separator to "*\n" and read in a record to a scalar
+	# this is a long "for" loop that creates clustalw alignments using different parameters
+	for ($n=0 ; $n<@parameters; $n++) {
+		for ($i=0; $i<@userfiles; $i++) {
+			system "clustalw $userfiles[$i] /output=PIR $parameters[$n]";  #the actual clustalw command
+		} #for
+	for ($i=0; $i<@userfiles; $i++) { #Read seqs from the *.pir files into @allseqs
+			$j = 0;
+			$filename = $userfiles[$i];
+			$filename =~ s/(.*)\.seq/$1.pir/;
+			open(IN, $filename) or die "Can't open \"$filename\": $!\n";
+			while ($line = <IN>) {
+			if ($i == 0  && $i != $#userfiles) {  #add the case of a single seq.file
+					$line =~ s/(.*)\n\*/$1/s;
+					$allseqs[$j] = $line;
+				}
+				else{
+					if($line =~ s/^>P1.*\n\n(.*)\n\*/$1/s){
+						
+						if ($line =~ s/^>P1.*\n\n(."*")/$1/s){
+							}
+						$line = $line . "*\n" if ($i == $#userfiles);  #if $i is the last element in the array
+				
+						
+							$allseqs[$j] = $allseqs[$j] . $line;
+							#$allseqs[$j] = $allseqs[$j] . "*\n";
+								}	
+						}
+			$j++;
+			} #while
+	
+			close(IN) or die "can't close  $filename: $!";
+		} #for ($i=0; $i<@userfiles; $i++)
+		
+		open (OUT, ">alignment$n.pir") or die "Can't opent the file alignment$n.pir: $!\n";
+		print OUT @allseqs;
+		close (OUT) or die "Can't close the file alignment$n: $!\n";
+	
+		} #for ($n=0; $n<@parameters; $n++)
+			$/ = $save_input_separator; # reset input separator 
+		
+}
+#===========================================
+#cette subroutine sert a sauveguarder les alignements avec un numero a chaque fois different (numero de l'alignement(0,1,2),annee,mois,jours,heures,minutes).
+sub Sauveguard {
+
+	($sec,$min,$heure,$mjour,$mois,$annee,$sjour,$ajour,$isdst)=gmtime(time);#transfert les valeurs de gmtime en variable facilement utilisable par la suite
+	$annee += 1900;		#donne le chiffre de l'annee en cours
+	#definie le numero a rajouter aux fichiers	
+	$date = ($annee.$mois.$mjour.$heure.$min);
+
+for ($n=0; $n<@parameters; $n++){
+	#cette boucle renome les fichiers pour chaque parametres	
+	$alignment0 = "alignment$n.pir";
+	$alignment10 = "alignment$n$date.pir";
+	
+	rename ($alignment0, $alignment10);
+
+}	
+}	
+#=======================================
+#cette subroutine fait la meme chose que celle precedente mais pour les proteines
+sub Sauveguard2{
+	
+	($sec,$min,$heure,$mjour,$mois,$annee,$sjour,$ajour,$isdst)=gmtime(time);
+	$annee += 1900;
+	$date = ($annee.$mois.$mjour.$heure.$min);
+	
+	$gene = "$1.pir";
+	$gene2 = "$1$date.pir";
+	
+	rename ($gene, $gene2);
+}
+#============================================
+sub UpdateList {
+# This subroutine updates species list after a species was added to the database
+    my $new_species = $_[0];
+    $filename[0] = $libpath . "species.list";
+    $filename[1] = "species.list";
+    ROUND: for ($i=0; $i<1; $i++) {
+	    #extrait le tableau comportant les noms d'espece
+        open(IN, $filename[0]) or die "Can't read from \"$filename\": $!\n";
+        	@species_list = <IN>;
+        close(IN) or die "Can't close  $filename: $!";
+	#compare les noms d'espece a celui de la nouvelle et determine si elle existe deja
+	foreach $species (@species_list) {
+            if ($species =~ /^$new_species/) {
+                print "Species $new_species is already present in $filename[$i].  Ignored.\n";
+                next ROUND;
+                }
+            }
+	    #complete le tableau avec le nom de la nouvelle espece
+        $new_species .= "\n";
+        push @species_list, $new_species;
+        @species_list = sort by_lc @species_list;	#classe le tableau
+        
+	open(OUT, ">$filename[$i]") or die "Can't write to \"$filename\": $!\n";
+        	print OUT @species_list;
+        close(OUT) or die "Can't close  $filename: $!";
+	}
+}
+
+#=================================================
+sub filtre {
+
+$numspece=0;
+local $souli="";
+$letter = "";
+@species="";
+
+#get the number of and the species to use from local species.list
+open(IN, "species.list") or die "Can't open \"species.list\": $!\n";
+	while ($line = <IN>) {
+		unless ($line =~ /^;/ || $line =~ /^ +;/) {
+		chomp($line);
+            if ($line =~ s/^ +(\S+)/$1/){
+                    $line=$1;
+                       }
+                if ($line =~ /^\S+/){
+			push @species, $line;
+			$numspece= $numspece + 1;
+		}	}
+			}
+close(IN) or die "Can't close \"species.list\": $!\n";
+
+unlink <*.pir>;
+		
+#print $numspece;
+$numtrait=0;
+print "There are $numspece species. Retain columns with how many amino acids: ";
+$numtrait = <STDIN>;
+if ($numtrait =~ /^\n/){
+	$numtrait =$numspece/2;
+}
+
+open (IN ,"<outfile") or die "Can't open \"outfile\": $!\n";
+$numline=0;
+
+while ($line =<IN>){
+
+if ($line=~/^ +(\d+) +/){
+chomp $line;
+push @debug, $line;
+}
+	if ($line=~s/(\d) alignments./$1/){ #select the number of alignment
+		$nbalig=$1;
+	}
+		if ($line=~/^alignment/ || $line=~/^#/){} #select the line who aren't write then
+		else{#create an array of an array
+			$numline=$numline+1; 
+			@tmp = split //,$line; 
+		         push @TdT, [ @tmp ];
+				}
+				}
+close(IN) or die "Can't close \"outfile\": $!\n";
+
+$num="";
+for ($z=$#debug;$z<=$#debug;$z++){
+	$num = substr($debug[$z],-5);
+		}
+	$num=($num%70);
+
+for ($k=2;$k<=$numline;$k=$k+$numspece+4){ #selectionne les paragraphe du fichier outfile
+	if  ($k==$numline-($numspece+3)){
+		$max=($num+17);
+	}
+	else {
+			$max=87;
+	}
+for ($j=17;$j<$max;$j++){	#permet de se deplacer de colonne a colonne
+
+	$souli=0;
+              @del="";
+
+for ($i=$k;$i<$k+$numspece+2;$i++) { #permet de ce deplacer de ligne a ligne 
+
+push @del, $TdT[$i][$j];  
+	
+		}#for ($i=$k;$i<$k+$numspece+2;$i++)
+		#@fil="";
+foreach $letter (@del){
+		$compare="";	
+
+for ($g=$numspece+2;$g<=$#del;$g++){
+	$compare=$del[$g];#selectionne la derniere lettre de la colonne
+	}#for ($g=$numspece+2;$g<=$#del;$g++)
+	
+#compte le nombre de - de la colonne presente dans le tableau @del		
+if ($letter =~ /-/  ) {
+$souli=$souli+1;
+	}#if ($let =~ /-/)
+}#foreach $let (@del)
+
+if ($souli>$numtrait or $compare ne $nbalig) {#si le nombre de - de la colonne est >= au nombre de traits souhaite par l'utilisateur ou si la derniere lettre de la colonne est differente du nombre d'alignement on passe a la colonne suivante
+}
+elsif ($compare =~ /^[^$nbalig]/) {
+	}#if ($souli>=5 or $compare != $nbalig)
+
+else {	
+push @fil, [ @del ]; #ecrit les colonnes dans @fil  
+}
+}#for ($j=17;$j<87;$j++)
+}#for ($k=2;$k<$#TdT;$k=$k+$numspece+4)
+
+open (OUT, ">fasta.pir") or die "Can't open \"fasta.pir\": $!\n";
+#ecrit et transforme le tableau @fil en format fasta
+for ($b=1;$b<$#del-1;$b++){
+		if ($b!=1){print OUT "\n*\n";
+
+	}
+print OUT ">$species[$b]";
+	
+for ($a=0;$a<=$#fil;$a++){
+	$division=$a%60;
+if ($division==0){print OUT "\n";}
+else{
+			print OUT $fil[$a][$b];
+}
+
+	}#for ($a=0;$a<=$#fil;$a++)
+}#for ($b=0;$b<$#del-1;$b++)
+
+	print OUT "\n*\n";		
+close (OUT) or die "Can't close \"fasta.pir\": $!\n";
+
+@fil="";
+}

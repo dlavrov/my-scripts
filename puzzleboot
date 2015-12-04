@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# PUZZLEBOOT - A simple utility for using PUZZLE with the PHYLIP suite of
+#              programs in distance bootstrap analysis.
+#
+# Version 1.03, November 30th, 1999
+#
+# Michael E. Holder ( holder@uh.edu )
+# High Performance Computing Center, Univ. of Houston, Houston TX 77004 USA
+#
+# Andrew J. Roger   ( aroger@is.dal.ca  )
+# Dept. of Biochemistry & Mol. Biol., Dalhousie Univ., Halifax NS B3H 4H7 Canada
+#
+# This work was originally conceived and developed while both of us were in the
+# employ of Mitch Sogin at the Marine Biological Laboratory, Hoods Hole,
+# MA 02543 USA.
+#
+# Location of puzzle program.  Since the user's path setup can vary from
+# site to site, the puzzle location is defined here to avoid a potential
+# problem with an X application also called puzzle.
+# CHANGE THIS NEXT 1 LINE to reflect what is correct for your site.
+PUZZLE=/usr/local/bin/puzzle
+
+# Initialization
+if [ ! -f ${1}.CURRENT.INP ]
+then
+	marker="`head -1 ${1} | cut -c 1-7`"
+	echo "Here is marker: ${marker}"
+	dsets="`grep "${marker}" ${1} | wc -l`"
+	flen="`cat ${1} | wc -l`"
+	slen=`expr ${flen} / ${dsets}`
+	split -a 3  -${slen} ${1} ${1}.splt.
+#	split  -l ${slen} ${1} ${1}.splt.
+fi
+
+for INP in `/bin/ls ${1}.splt.*` 
+do
+	echo ${INP} > ${1}.CURRENT.INP
+	cat puzzle.cmds >> ${1}.CURRENT.INP
+	${PUZZLE} < ${1}.CURRENT.INP
+        cat outdist >> ${1}.outdist
+        rm ${INP} ${1}.CURRENT.INP 
+	if [ -f outfile ]
+	then
+		rm outfile
+	fi
+	if [ -f outdist ]
+	then
+		rm outdist
+	fi
+	if [ -f outtree ]
+	then
+		rm outtree
+	fi
+done
+
+

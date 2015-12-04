@@ -1,0 +1,183 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                   go2ps                                   #
+$VERSION = "version 0.2";    						    #
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 03/18/2009,                          #
+#############################################################################
+
+use strict;
+use warnings;
+my $atp_color = "0.5 0.5 1"; #"1 0.8 0.67";
+my $cob_color = "0.9 0.67 0.9";
+my $cox_color = "1 0.5 0.5"; #"0.67 0.96 1";
+my $nad_color = "1 1 0.5"; #"0.71 1 0.67";
+my $rrna_color = "0.5 1 0.5";#"0.95 1 0.56";
+my $tRNA_color = ".97 0.78 1";
+my $other_color = "1 0 0";
+my $left_margin=100; #initial $x ##was 72
+my $top_margin=720; #initial $y
+#my $prot_rrna_length = 20;
+my $tRNA_length = 0;
+my $width = 7;
+my $prot_rrna_length=80;
+my $scale_size=30000;
+die "Usage: go2psv <coordinate file> [> outfile]\n" unless $ARGV[0];
+my $species_name="";
+my $gene_record="";
+my $y=$top_margin;
+
+
+print "%!PS\n
+/cp {closepath} bind def
+/slw {setlinewidth} bind def
+/m {newpath moveto} bind def
+/rl {rlineto} bind def
+/gs {gsave} bind def
+/gr {grestore} bind def
+/s {stroke} bind def
+/sf {setrgbcolor fill} bind def
+/sc {scalefont} bind def\n";
+
+#draw a scale
+#do it later ;)
+
+while (<>) {
+	chomp;
+	if (/^\s*;/ or /^\s*$/) { next;}
+	elsif (/^\S+\s+\S+\s+/) {
+		$gene_record = $_;
+	}
+	else {
+		die "Wrong file format: $_\n";
+	}
+	####
+	#if ($y<92) {
+	#	print "showpage\n";
+	#	$y = $top_margin;
+	#}
+
+	my $x=$left_margin;
+	#print_species_name ($x, $y, $species_name);
+	#$y -= 20;
+	#$x=$left_margin;
+	my ($gene_name, $gene_start, $gene_end) = split (" ",$gene_record);
+	$prot_rrna_length = int(($gene_end - $gene_start)/50);
+	$y=$top_margin-($gene_start/50);
+	($x,$y) = draw_next_gene ($x, $y, $gene_name);
+	$x -= $width;
+	$gene_record ="";
+	
+}
+
+sub draw_next_gene {
+	my ($x, $y, $gene) = @_;
+	$x += $width if ($gene =~ /^-\w+/);
+	$gene =~ s/^[-\+](\w+)/$1/;
+	my $color = $other_color;
+	my $length = $prot_rrna_length;
+	if ($gene =~ /^genome/) {
+		$x += ($width/2);
+                print "1.0 slw                                                                                                                   
+                $x $y m                                                                                                                          
+		0 -$length rl                                                                                                                      
+		s\n\n";
+	}
+	elsif ($gene =~ /^trn/) {
+		if ($gene =~ /trnL\(uag\)/) {
+			$gene = "L1";
+		}
+		elsif ($gene =~ /trnL\(uaa\)/) {
+			$gene = "L2";
+		}
+		elsif ($gene =~ /trnS\(gcu\)/) {
+			$gene = "S1";
+		}
+		elsif ($gene =~ /trnS\(uga\)/) {
+			$gene = "S2";
+		}
+		elsif ($gene =~ /trnI\(cau\)/) {
+			$gene = "I2";
+		}
+		else {
+			$gene =~ s/trn(.).*/$1/;
+		}
+		
+		$color =$tRNA_color;
+		$length = $tRNA_length;
+		
+		print "1.0 slw
+		$x $y m
+		$width 0 rl
+		s\n\n";
+	}
+	else {
+		if ($gene =~ /atp/) {
+			$color = $atp_color;
+		}
+		elsif ($gene =~ /cob/) {
+			$color = $cob_color;
+		}
+		elsif ($gene =~ /cox/) {
+			$color = $cox_color;
+		}
+		elsif ($gene =~ /nad/) {
+			$color = $nad_color;
+		}
+		elsif ($gene =~ /^rn/) {
+			$color = $rrna_color;
+		}
+		else {}
+
+		print "0.5 slw
+		$x $y m
+		0 -$length rl
+		$width 0 rl 
+		0 $length rl 
+		cp
+		gsave
+		$color sf
+		gr
+       		s\n";
+	}
+
+        my $gene_name_length = length ($gene);
+        my $text_x = $x-20;
+        if ($gene_name_length == 1) {    #tRNA genes
+                $text_x = $text_x+5;
+        }
+        elsif ($gene_name_length == 2) {    #tRNA genes with letter
+                $text_x = $text_x+4;
+        }
+        elsif ($gene_name_length == 3) { #rns, rnl, cob
+                $text_x = $text_x+3 ;
+        }
+        elsif ($gene_name_length == 4) { #most genes
+                $text_x = $text_x+2;
+        }
+        elsif ($gene_name_length == 5) {
+                $text_x = $text_x+1;
+        }
+        else {
+               $text_x = $x;
+       }
+	my $text_y = $y-($length/2);	
+	print "/Times-BoldItalic findfont 
+	6 sc
+	setfont 
+	$text_x $text_y moveto 
+	($gene) show\n\n";
+	
+	$y=$y+$length;
+	return ($x, $y);
+}
+
+sub print_species_name {
+	my ($x, $y, $species_name) = @_;
+print "/Times-BoldItalic findfont 
+8 sc 
+setfont 
+$x $y m
+($species_name) show\n\n";
+}

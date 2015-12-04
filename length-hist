@@ -1,0 +1,16 @@
+#!/usr/bin/perl
+
+use Bio::SeqIO;
+use strict;
+
+my $io = Bio::SeqIO->new(-format => 'fasta', -file => $ARGV[0]);
+
+my %hist;
+while(my $seq = $io->next_seq){
+	$hist{$seq->length}++;
+	print $seq->length."\n";
+}
+
+foreach my $len (sort {$b <=> $a} keys %hist){
+#	print "$len\t$hist{$len}\n";
+}

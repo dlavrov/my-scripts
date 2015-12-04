@@ -1,0 +1,110 @@
+#! /usr/bin/perl -w
+use strict;
+use Bio::AlignIO;
+my $in = new Bio::AlignIO ( -file =>, $ARGV[0], -format => 'clustalw' );
+my $limit = $ARGV[1];
+die "Usage: testal filename max_number_of_steps\n" unless defined($limit);
+my $sout = Bio::AlignIO-> newFh ( -file => ">slow$limit.nex", -format => 'nexus' );
+my $fout = Bio::AlignIO-> newFh ( -file => ">fast$limit.nex", -format => 'nexus' );
+my $aln = $in->next_aln();
+print STDERR $aln->no_sequences, "\n";
+print STDERR $aln->length, "\n";
+print STDERR "same length of all sequences: ",
+($aln->is_flush()) ? "yes" : "no", "\n";
+my @steps;
+my $length = $aln->length;
+
+# Check sequence names in the alignment
+my ($seq, $id, %hash) ;
+foreach  $seq ( $aln->each_seq() ) {
+$id = $seq->id();
+$id =~ s/^(..).+/$1/;
+$hash{$id}++;
+}
+my $n = scalar (keys %hash);
+my @aln;
+my $count = 1;
+my $prev = 0;
+# I have to fill my array with small alignments: e.g. $aln[1] = $aln->select(1, 9);
+foreach $id ( sort (keys %hash )) {
+	$aln[$count] = $aln->select($prev+1, $prev+$hash{$id});
+	$count++;
+	$prev += $hash{$id};
+	print "$id has $hash{$id} sequences in this alignment\n";
+}
+# #             
+my $i;
+for ($i=1; $i<$n+1; $i++) {
+	my $res;
+	my $pos;
+	for ($pos=1; $pos<$length+1; $pos++) {
+		my %count;
+		foreach my $seq ($aln[$i]->each_seq) {
+      			$res = $seq->subseq($pos, $pos);
+      			$count{$res}++;
+			}
+		my @keys = keys %count;
+		$steps[$pos-1] += @keys-1;
+  		}
+	}
+	for ($i=0; $i<@steps; $i++) {
+#printf "Pos: %s Steps: %s\n" , $i, $steps[$i];
+}
+# if you need to working on the columns, create a list containing all columns as
+# # strings
+my @aln_cols = ();
+foreach my $seq ( $aln->each_alphabetically() ) {
+my $colnr = 0;
+foreach my $chr ( split("", $seq->seq()) ) {
+$aln_cols[$colnr] .= $chr;
+$colnr++;
+}
+}
+# # then do the work:
+# # we want to eliminate all the columns containing gaps
+# # 1/ we create a list containing all the columns without any gap
+# my $gapchar = $aln-&gt;gap_char();
+my @slow_cols = ();
+my @fast_cols = ();
+my $colnr = 0;
+my $gapchar = $aln->gap_char();
+foreach my $col ( @aln_cols ) {
+	if ($col =~ /\Q$gapchar\E/) {
+		$colnr++;
+		next;
+	}
+	push @slow_cols, $col if ($steps[$colnr] <= $limit);
+	push @fast_cols, $col if ($steps[$colnr] > $limit);
+	$colnr++;
+}
+# # 2/ we modify the sequences in the alignment
+# # 2a/ we reconstruct the sequence strings
+my @seq_strs = ();
+foreach my $col ( @slow_cols ) {
+$colnr = 0;
+foreach my $chr ( split"", $col ) {
+$seq_strs[$colnr] .= $chr;
+$colnr++; }}
+# # 2b/ we replace the old sequences strings with the new ones
+foreach my $seq ( $aln->each_alphabetically() ) {
+	$seq->seq(shift @seq_strs);}
+print $sout $aln;
+
+
+
+print "[", $aln->percentage_identity, "\n";
+print $aln->consensus_string(100), "]\n";
+
+my @seq_strs = ();
+foreach my $col ( @fast_cols ) {
+	my $colnr = 0;
+	foreach my $chr ( split"", $col ) {
+		$seq_strs[$colnr] .= $chr;
+		$colnr++; }}
+# # 2b/ we replace the old sequences strings with the new ones           
+foreach my $seq ( $aln->each_alphabetically() ) {
+         $seq->seq(shift @seq_strs);}                                     
+ # print "FAST:\n";
+ print $fout $aln;
+print "DONE!\n";
+return 1;

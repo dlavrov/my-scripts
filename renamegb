@@ -1,0 +1,36 @@
+#!/usr/bin/perl
+# Example 10-6 - test program for parse_annotation subroutine
+
+use strict;
+use warnings;
+use BeginPerlBioinfo;     # see Chapter 6 about this module
+use File::Copy;
+
+# Declare and initialize variables
+my $fh;
+my $record;
+my $dna;
+my $annotation;
+my %fields;
+my $seqfile;
+foreach $seqfile (@ARGV) {
+        my $fname;
+        die("must define a valid seqfile to read") unless ( defined $seqfile && -r $seqfile);
+	$fh = open_file($seqfile);
+
+	$record = get_next_record($fh);
+
+	# Parse the sequence and annotation
+	($annotation, $dna) = get_annotation_and_dna($record);
+
+	# Extract the fields of the annotation
+	%fields = parse_annotation($annotation);
+
+	# Print the fields
+    	my ($kingdom, $phylum) = ($fields{SOURCE} =~ /Eukaryota;\s+(\w+);\s+(\w+);/);
+    	my ($gname, $sname) = ($fields{DEFINITION} =~ /DEFINITION\s+(\w+)\s+(\w+)/);
+	my $newfile = ($phylum || "XXX") . "_" . ($gname || "XXX") . "_" . ($sname || "XXX") . ".gbk";
+	move ($seqfile, $newfile) unless (defined $newfile && -e $newfile);
+	}
+exit;
+

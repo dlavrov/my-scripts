@@ -1,0 +1,18 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Bio::SeqIO;
+
+my $in = Bio::SeqIO->new(-format => 'fasta', -file => $ARGV[0]);
+
+my @seqs;
+while(my $seq = $in->next_seq){
+	push @seqs, $seq;
+}
+
+print scalar(@seqs)." ".$seqs[0]->length."\n";
+foreach(@seqs){
+	print $_->id."      ".$_->seq."\n";
+}

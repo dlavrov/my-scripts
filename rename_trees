@@ -1,0 +1,55 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                            rename_trees                                   #
+$VERSION = "version 0.1";    						    #
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 04/25/2010,                          #
+#############################################################################
+
+use strict;
+use warnings;
+
+# Perl libraries.
+#require "/usr/local/lib/perl/ogmp/subarray.pl";
+use File::Copy;
+                                                                                                                                                 
+
+open(FH,"/research/seqlib/other/species_names.lst") || die "Can't open \"species.names.lst\": $!\n";
+my @species_names=<FH>;
+close(FH);
+@species_names=grep(!/^\s*#|^\s*$/,@species_names);
+
+for (;;) { # $seqfile (@ARGV)
+        my $fname = $ARGV[0];
+	last unless defined ($fname);
+	copy ("$fname", "$fname.bak");
+	my $outfile = "$fname";
+	open(IN,"<$fname") || die "Can't read from \"$fname\": $!\n";
+	my @all_trees = <IN>;
+	close(IN) or die "Can't close $fname: $!\n";
+	open(OUT,">$outfile")|| die "Can't open \"$outfile\": $!\n";
+	foreach my $tree (@all_trees) {
+		my $new_tree = Replace_names($tree,@species_names);
+		print OUT "$new_tree\n";
+	}
+	close(OUT) or die "Can't close \"$outfile\": $!";
+	shift;
+}
+sub Replace_names {
+	my ($tree, @species_names) = @_;
+	foreach my $line (@species_names) {
+    		chomp $line;
+    		my @names=split(/\|/,$line);
+    		grep(s/^\s+// && 0,@names);  # Remove leading spaces
+    		grep(s/\s+$// && 0,@names);  # Remove trailing spaces
+    		grep(s/^-$//  && 0,@names);  # Replace hashes by empty strings.
+    		my $prefered_name = shift(@names);
+    		foreach my $alt_name (@names) {
+	    		if ($tree =~ /$alt_name/) {
+		    		$tree =~ s/$alt_name/\'$prefered_name\'/;
+	    		}
+    		}
+	}
+	return $tree;
+}

@@ -1,0 +1,151 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                  rmtrees                                  #
+$VERSION=                       "version 1.1"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 11/02/2001,                          #
+#############################################################################
+
+#This programs removes trees judged to be inferior by KH, SH, or RELL test from a treefile
+
+#use strict;
+use warnings;
+require "ogmp/subarray.pl";
+
+
+#Declare and initialize variables
+my @ORG = ();
+my @TREESIN = ();
+my @TREESOUT = ();
+my @PAMLFILE = ();
+my @PAMLTESTS = ();
+my @mytest = ();
+my $answer = "";
+my $datafile = "results.paml";
+my $outfile = "";
+my $treefile = "cleantrees";
+my $treenumber = 0;
+my $n = 0;
+my $shtest = 0.0;
+my $LoG;
+my $USER;
+my $test = 2;
+my $signif = 0.05;
+
+# Get login name.
+$USER=getlogin;
+if (!$USER) {
+    ($USER) = getpwuid($<);
+    if (!$USER) {
+        print "Can't find USER from environment!\n";
+        exit;
+        }
+    }
+
+
+($LoG) = ($0 =~ m#([^/]+)$#);
+system("echo `date +%y-%m-%d,%H:%M:%S` \$USER $LoG $VERSION >>/usr/local/log/ogmplog");
+
+
+# Main program.
+
+#Ask for a treefile
+@ORG = &Open_a_file($treefile, 'treefile');
+
+$outfile = $treefile . ".out";
+if (-e $outfile) {
+        print "File $outfile exist!  Do you want to rewrite it? (Y/N)\n> ";
+        $answer = <STDIN>;
+        chomp $answer;
+        exit if ($answer ne "Y" && $answer ne "y");
+}
+print "The output is directed to the file $outfile\n";
+
+for ($n=0;$n<@ORG;$n++) 
+{
+   if( $ORG[$n] =~ /^\(+.*\);.*$/ )
+   {
+       push(@TREESIN,$ORG[$n]);
+   }
+}   
+
+
+# Get datafile
+
+@PAMLFILE = &Open_a_file($datafile, 'paml results file');
+
+# Extract the tree comparison part
+*DATA = \@PAMLFILE;
+@PAMLTESTS=&ExtractSubArrayEnd('^Tree comparisons',*DATA,"","","");
+
+# Ask for a test
+print "What test do you want to use to select the trees? ($test)\n";
+print "(KH = 1, SH = 2, RELL = 3)\n> ";
+chomp($answer = <STDIN>);
+$test = $answer if $answer;
+
+print "What significance level do you want to use? (0.05)\n> ";
+chomp($answer = <STDIN>);
+$signif = $answer if $answer;
+
+# Search the tree part of the file for the results of comparisons
+for ($n=0;$n<@PAMLTESTS;$n++) 
+{
+   if( $PAMLTESTS[$n] =~ /^ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ *$/ )
+   {
+       ($treenumber, $mytest[1], $mytest[2], $mytest[3]) = ( $PAMLTESTS[$n] =~ /^ +(\d+)\*? +[^ ]+ +[^ ]+ +[^ ]+ +-?([^ ]+) +-?([^ ]+) +([^ ]+) *$/);
+       if ($mytest[$test] > $signif) {
+       		push(@TREESOUT, $TREESIN[$treenumber-1]);
+       		}
+       					
+   }
+}
+
+# Output
+
+open(OUT,">$outfile") or die "Can't open $outfile: $!";
+print OUT @TREESOUT;
+print STDERR scalar(@TREESIN), " -> ", scalar(@TREESOUT), "\n";
+close OUT;
+
+#
+# Subroutines
+#
+
+# This subroutine opens a file
+sub Open_a_file {
+	#open file
+	local($filename, $request) = @_;
+	print "Please enter the name of the $request ($filename):\n> ";
+	chomp($answer = <STDIN>);
+	$filename = $answer if $answer;
+
+	#read datafile
+	
+	open(IN,"<$filename") || die "Can't read from \"$filename\": $!\n";
+	@RET = <IN>;
+	close(IN) or die "can't close  $filename: $!";
+	return @RET;
+	}
+
+	
+	
+# It's used from the OGMP library now
+# This subroutine extracts subarray from the data file.
+# sub ExtractSubArrayEnd {
+#    local($SPat,*ARRAY,$ex,$end) = @_;
+#    local($m,$s,@RET);
+#    for($m=$end?$#ARRAY:0;$m>=0&&$m<=$#ARRAY;$m += $end?-1:1) {
+#        $_ = $ARRAY[$m];
+#        if (/$SPat/) {
+#            $s=$m;
+#            last;
+#            }
+#        }
+#    return () if (!defined($s));
+#    @RET=@ARRAY[$s..$#ARRAY];
+#    splice(@ARRAY,$s) if $ex;
+#    return @RET;
+#    }
+

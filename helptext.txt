@@ -1,0 +1,81 @@
+Documentation
+
+Introduction
+
+This program computes the normal and the cumulative skew of two selectable
+nucleotides for a given sequence. The result is displayed in two different
+graphs.
+
+The user can choose the pair of nucleotides the skew should be calculated for.
+In such a skew the relation of the nucleotides is given by a formula.
+The particular values are computed by the formula:
+Skew = (nucleotide1 - nucleotide2) / (nucleotide1 + nucleotide2)
+
+For the computation the genome is separated into parts, socalled windows.
+For every window the value of the skew is calculated. The normal graph displays
+every single value related to the particular position in sequence.
+The cumulative graph adds up the values for all previous windows up to the
+certain position.
+The windows are shifted along the sequence by a certain stepsize.
+To improve the result the stepsize can be reduced.
+The global minimum and maximum are displayed in the cumulative graph.
+The minimum and maximum of a GC-skew can be used to predict the
+origin of replication (minimum) and the terminus location (maximum) in
+procaryotic genomes.
+
+
+Tutorial
+
+How to access a file
+
+After starting the program you can open a file by using the menue (File/open).
+Please notice that only text files containing a single sequence without any
+additions or the sequence in FASTA-format are allowed.
+For further information about FASTA-files please visit
+http://athena.bioc.uvic.ca/pbr/VGO/manuals/fasta_acquisition/fasta_acquisition.html
+
+After loading the file the program automatically draws the graphic using the
+default settings (nucleotides G and C, resolution 1024x768,  windowsize and
+stepsize sequencelength/1000).
+
+How to change settings
+
+The windowsize, the stepsize and the nucleotides are selectable. It is not
+allowed to select the same nucleotide in both fields (e.g. A and A).
+If this happens the complementary nucleotide is automatically set for
+the second field.
+If you increase the windowsize and decrease the stepsize you will get
+more significant values but the calculating time will be longer depending
+on the capacity of the computer you use.
+That's why the step- and windowsize are limited.
+
+Negative values are not allowed. Therefore the value will be set one by default if you try to type negative ones. The sizes for the window and the step
+are restricted as well. The size for the window must be larger than the
+length of sequence divided by 10000 or rather the length of the sequence
+divided by 1000. If you change the settings the skew will be automatically
+recomputed.
+
+How to save the results
+ 
+You can save the results in different forms. The graphic can be saved in
+jpg- or png-format (File/save plot as image).
+The first column in the text file lists the positions of the single values,
+the second column shows the normal and the third column the cumulative values.
+The data of the skew can be saved as a text file (File/Save plot as text).
+You can use this file to export the data into a spreadsheet program
+(e.g. Excel) to create a diagram with your own settings.
+The program types the minimum of the cumulative graph of the computed skew into
+the field “oriC”.
+You can also save the sequence with the calculated origin of replication as
+start point of the sequence. You can decide to change the value of the origin.
+After changing the origin this field is protected and marked yellow even if a
+new plot is computed. If you want to save the rearranged sequence press
+File/Save sequence.
+
+System requirements:
+
+Java2 (1.4.2 recommended)
+
+Operating Systems:
+Every OS that runs Java2
+(tested on Linux, Windows, MacOS X)

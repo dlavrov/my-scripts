@@ -1,0 +1,20 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+open FILE, $ARGV[0];
+
+while(<FILE>){
+        my $tree = $_;
+	$tree =~ s/&label/&date_range/g;
+        while($tree =~ /(\"(\d+\.?\d+)_(\d+\.?\d+)\")/g){
+                my ($range,$max,$min) = ($1,$2,$3);
+                $tree =~ s/$range/\{$max,$min\}/;
+        }
+        print $tree;
+}
+
+close FILE;
+
+#[&label="67.2174_11.0573"]

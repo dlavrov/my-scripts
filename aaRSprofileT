@@ -1,0 +1,7 @@
+#1 = input hmm
+#2 = output file base
+#3 = input sequence file
+
+hmmsearch -E 1e-5 --domtblout $1:r.tab /research/projects/aaRS/Pett_2014/hmm/aars.hmm $1
+/research/projects/aaRS/Pett_2014/bin/gethits.py $1:r.tab $1 > $1:r.hits.fa
+aaRSpplacer $1:r.hits.fa

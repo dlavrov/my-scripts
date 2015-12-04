@@ -1,0 +1,18 @@
+#! /usr/bin/perl
+
+use strict;
+use Bio::SeqIO;
+
+my $empty = 0;
+my $empty = 1 if $ARGV[0] eq 'e';
+shift @ARGV if $empty;
+foreach(@ARGV){
+	my $file = $_;
+	my $count=0;
+	my $seqio = Bio::SeqIO->new( -format => 'fasta',-file => $file);	
+	while(my $seq = $seqio->next_seq){
+		$count++;
+		$count-- if $empty and $seq->seq eq '';
+	}
+	print "$file:\t$count\n";
+}

@@ -1,0 +1,15 @@
+#!/usr/bin/perl
+
+unless(@ARGV){
+	print "plotcoevoltree <chain_name>\n";
+}
+
+my $chain = $ARGV[0];
+system("readcoevol $chain");
+
+my @tabs = <$chain.*.tab>;
+foreach my $tab (<$chain.*.tab>){
+	next if $tab eq "$chain.postmeandates.tab";
+	system("plotcoevoltree.R $chain.postmeandates.tre $tab");
+}
+

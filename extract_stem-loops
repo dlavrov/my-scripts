@@ -1,0 +1,59 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                             extract_stem-loops                            #
+$VERSION=                       "version 1.0"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 09/22/2011,                          #
+#############################################################################
+#
+# extract all non-coding elements from a masterfile; find how many
+#
+# make a loop with grep to create individual files with these elements
+#
+# align all the elements
+
+use strict;
+use warnings;
+
+die "Usage: extract_stem-loops mf_filename \n" unless (@ARGV);
+
+my $masterfile = shift();
+my ($file, $extension) = ($masterfile =~ /(.+)\.(.+)/);
+my ($species) = ($file =~ /^(.....)/);
+print "$file and  $extension\n";
+my $non_coding = $file . ".seq-n";
+system "pepper -n $masterfile";
+open(IN, "$non_coding") or die "Can't read $non_coding: $!\n";
+my $number_of_types = 0;
+while (<IN>) {
+	if ($_ =~ /Mot-H\d+_\d+/) {
+		my ($element) = ($_ =~ /Mot-H(\d+)_\d+/);
+		if ($element > $number_of_types) {
+			$number_of_types = $element;
+		}
+	}
+}
+close(IN);
+my $i=0;
+while ($i<$number_of_types) {
+	$i++;
+	print "$i\n";
+	my $match = "Mot-H".$i."_"; #wasn't sure how to put _ after the variable name in the search :)
+	system "grep -A1 '$match' $non_coding > H$i.temp";
+	open (IN, "H$i.temp") or die "Can't read H$i.temp: $!\n";
+	open (OUT, ">H$i.seq") or die "Can't open H$i.seq: $!\n";
+	while (<IN>) {
+		next if (/^;/ or /--/);
+		if (/Mot-H\d+_\d+/) {
+			($_) = ($_ =~/Mot-(H\d+_\d+)/);
+			$_ = ">".$species."_".$_."\n";
+		}
+		print OUT;
+	}
+	close (IN);
+	close (OUT);
+}
+system "alignall -clustalw *.seq";
+
+print "I'm done! \n";

@@ -1,0 +1,124 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                   gorcom                                  #
+$VERSION=                       "version 2.0"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 05/28/2007,                          #
+#############################################################################
+
+use strict;
+require "GO.pm"; #/usr/local/lib/perl/GO.pm
+
+my $shared = "";
+my $unique = "";
+my $problems ="";
+my $average = 0;
+my $percentage_average = 0;
+my $max_number = 0;
+my $print_shared=0;
+my $print_unique=0;
+my $print_count=0;
+my $print_all=0;
+my $total_count=0;
+
+# Parse command-line options.
+
+&usage unless $ARGV[0];
+for (;;)
+{
+    my ($opt) = ($ARGV[0] =~ /^-([usca]).*$/);
+    last if $opt eq "";
+    $print_unique=1  if $opt eq "u";
+    $print_shared=1  if $opt eq "s";
+    $print_count=1   if $opt eq "c";
+    $print_all=1     if $opt eq "a";
+    shift;
+}
+
+#($LoG) = ($0 =~ m#([^/]+)$#);
+#system("echo `date +%y-%m-%d,%H:%M:%S` \$USER $LoG >>/usr/local/log/ogmplog");
+
+while (@ARGV>1) {
+	my $file = shift();
+	my @files_to_compare = @ARGV;
+	my $line;
+	my $numbers = "";
+	my $percentage ="";
+	&usage if @files_to_compare <1;
+	open(IN, "$file") or die "Can't read $file: $!\n";
+	while (<IN>) {
+		next if /^;/;
+		chomp($line = $_);
+		last;
+		}
+	close(IN) or die "Can't close $file: $!\n";
+	my $first_genome_boundaries = GetBoundaries($line, \$problems); #GetBoundaries is located in GO.pm
+	my @first_genome = split(/ /,$first_genome_boundaries);
+	@first_genome = sort(@first_genome);
+	my $first_genome_size = scalar(@first_genome);
+
+	foreach my $file2 (@files_to_compare) {
+		die("must define a valid seqfile to read") unless ( defined $file2 && -r $file2);
+		open(IN, "$file2") or die "Can't read $file2: $!\n";
+		while (<IN>) {
+			next if /^;/;
+			chomp($line = $_);
+			last;
+			}
+		close(IN) or die "Can't close $file2: $!\n";
+		my $second_genome_boundaries = GetBoundaries($line, \$problems);
+		my @second_genome = split(/ /,$second_genome_boundaries);
+		my $second_genome_size = scalar(@second_genome);
+		@second_genome = sort(@second_genome);
+		my $boundary_one;
+		my $boundary_two;
+		#print "My first genome: @first_genome\n";
+		#print "My second genome: @second_genome\n";
+		$shared .= "\n;+++++++++++ $file : $file2 ++++++++++++\n";
+		$unique .= "\n;+++++++++++ $file2 : $file ++++++++++++\n";
+		my $number_shared = 0;
+		my $percentage_shared = 0;
+		LOOP1: foreach $boundary_one(@second_genome) {
+			LOOP2: foreach $boundary_two(@first_genome) {
+				if ($boundary_one eq $boundary_two) {
+					$shared .= "$boundary_two ";
+					$number_shared++; #count the number of shared boundaries
+					next LOOP1;
+				}
+			}
+			$unique .= "$boundary_one ";
+		}
+		$percentage_shared = 200*$number_shared/($first_genome_size+$second_genome_size);
+		if ($number_shared != 1) {$shared .= "\n$number_shared boundaries are shared\n";}
+		else {$shared .= "\n$number_shared boundary is shared\n";}
+		$numbers .= "$number_shared ";## this was used to get just the numbers
+		$percentage .= sprintf("%.0f", $percentage_shared);
+		$percentage .= " ";
+		$total_count++;
+		$max_number = $number_shared if ($number_shared > $max_number);
+		$average += $number_shared;
+		$percentage_average += $percentage_shared;
+	}
+	# $average /= scalar(@files_to_compare);
+	if ($print_all) {
+		print "\nNumber and percentage of shared boundaries:\n$file vs @files_to_compare\n$numbers\n$percentage\n";
+	}
+	else {
+		print "\nShared boundaries:\n$shared\n" if (!$print_unique && !$print_count && !$print_shared);
+		print "\nShared boundaries:\n$shared\n" if ($print_shared);
+		print "\nUnique boundaries:\n$unique\n" if ($print_unique);
+		print "\nNumber of shared boundaries:\n@files_to_compare\n$numbers\n" if ($print_count);
+		last;
+	}
+}
+$average /= $total_count;
+$percentage_average /= $total_count;
+print "\nMaximum number of shared boundaries:  $max_number\n";
+print "\nAverage number of shared boundaries:  $average ($percentage_average%)\n";
+print "\nDone!\n"; 
+
+sub usage {
+	print "Usage: gorcom {-usca} gene_order_files to compare\n";
+	exit;
+	}

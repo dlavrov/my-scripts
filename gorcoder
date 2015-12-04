@@ -1,0 +1,183 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                  arranger                                 #
+$VERSION=                       "version 1.0"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 10/12/2001,                          #
+#############################################################################
+
+############## TO DO LIST ################
+##########################################
+
+# Design
+# Create two lookup tables (upstream, downstream)
+# Create an array with 74 cells
+# Reformat gene boundaries
+# Get info from each of them
+# Print species, array to the file
+
+use strict;
+my $uphushref = createhush(0);
+my $downhushref = createhush(1);
+my ($gorfile, $genepair);
+my $outfile = "gorder.dat";
+my $outfile2 = "gorder.tab";
+#remove old output file (if exists)
+if (-e $outfile) {
+	print "Rewriting file \"$outfile\"!\n";
+}
+if (-e $outfile2) {
+       print "Rewriting file \"$outfile2\"!\n";
+}
+open(OUT, ">$outfile") || die "Can't write to \"$outfile\": $!\n";
+open(OUT2, ">$outfile2") or die "Can't write to \"$outfile2\": $!\n";
+print OUT "#NEXUS
+begin data;
+dimensions ntax = " . scalar(@ARGV) . " nchar = 5476;
+matrix\n\n";
+foreach $gorfile (@ARGV) {
+	my ($line, $boundary);
+	my @gene_boundaries;
+	open(IN,"<$gorfile") || die "Can't read from \"$gorfile\": $!\n";
+	while (<IN>) {
+	        next if /^;/;
+	        chomp($line = $_);
+	        last;
+	}
+	close(IN) or die "Can't close $gorfile $!\n";
+	#make species name
+	$gorfile =~ s/^[^_]+_([^_]{1,5})[^_]*_([^_]{1,4}).*/$1_$2/;
+	my @gene_pairs = split(/ /,$line);
+	#open(OUT, ">>$outfile") or die "Can't write to \"gorder.dat\": $!\n";
+	foreach $genepair (@gene_pairs) {
+		my ($sign1, $gene1, $sign2, $gene2);
+		if ($genepair =~ /^(\+|-)(.+)(\+|-)(.+)$/) {
+			($sign1, $gene1, $sign2, $gene2) = ($genepair =~ /^(\+|-)(.+)(\+|-)(.+)$/);
+			$gene1 =~ s/(\w+)\((\w+)\)/$1_$2/ if ($gene1 =~ /\(\S+\)/) ; #get rid of the brackets
+			$gene2 =~ s/(\w+)\((\w+)\)/$1_$2/ if ($gene2 =~ /\(\S+\)/) ; #get rid of the brackets
+		}
+		else {print "Can't figure out this genepair: $genepair\n"; next;}
+		if ($sign1 eq "+" && $sign2 eq "+") {
+			$gene_boundaries[$downhushref->{$gene1}] = $uphushref->{$gene2};
+			$gene_boundaries[$uphushref->{$gene2}] = $downhushref->{$gene1};
+		}
+		elsif ($sign1 eq "-" && $sign2 eq "+") {
+                        $gene_boundaries[$uphushref->{$gene1}] = $uphushref->{$gene2}; #we will have to use table 2 for the other strand genes
+                        $gene_boundaries[$uphushref->{$gene2}] = $uphushref->{$gene1};
+		}						
+		elsif ($sign1 eq "+" && $sign2 eq "-") {
+			$gene_boundaries[$downhushref->{$gene1}] = $downhushref->{$gene2};
+			$gene_boundaries[$downhushref->{$gene2}] = $downhushref->{$gene1};
+		}
+		else {print "Can't figure out this genepair: $genepair\n";}
+	}
+	print OUT "$gorfile\n";
+	print OUT2 "$gorfile ";
+	foreach $boundary (@gene_boundaries) {
+		if (defined $boundary) {
+			print OUT2 "$boundary ";
+			my $i;
+			if ($boundary > 0 && $boundary < 73) {
+				for ($i = 0; $i < $boundary; $i++) { print OUT "0";}
+				print OUT "1";
+				for ( $i = $boundary + 1; $i < 74; $i++) { print OUT "0";}
+				print OUT "\n";
+			}
+			elsif ($boundary == 0) {print OUT "1" . "0" x 73 . "\n";}
+			elsif ($boundary == 73) {print OUT "0" x 73 . "1" . "\n";}
+		}
+		else {print OUT "?"x74 . "\n"; print OUT2 "?\t";}
+	}
+	print OUT "\n";
+	print OUT2 "\n";
+}
+print OUT ";\nend;\n";
+close(OUT) or die "Can't close \"$outfile\": $!\n";
+close(OUT2) or die "Can't close \"$outfile2\": $!\n";
+print "Done!\n";
+exit 0;
+
+#This routine creates a lookup table and returns a reference to it
+sub createhush {
+	my $downhash = shift(@_);
+	my $addme = $downhash ? 0 : 37;
+        my $retref = {
+                atp6 => 0+$addme,
+                atp8 => 1+$addme,
+                cob => 2+$addme,
+                cox1 => 3+$addme,
+                cox2 => 4+$addme,
+                cox3 => 5+$addme,
+                nad1 => 6+$addme,
+                nad2 => 7+$addme,
+                nad3 => 8+$addme,
+                nad4 => 9+$addme,
+                nad4L => 10+$addme,
+                nad5 => 11+$addme,
+                nad6 => 12+$addme,
+                rnl => 13+$addme,
+                rns => 14+$addme,
+                trnA => 15+$addme,
+                trnC => 16+$addme,
+                trnD => 17+$addme,
+                trnE => 18+$addme,
+                trnF => 19+$addme,
+                trnG => 20+$addme,
+                trnH => 21+$addme,
+                trnI => 22+$addme,
+                trnK => 23+$addme,
+                trnL_uaa => 24+$addme,
+                trnL_uag => 25+$addme,
+                trnM => 26+$addme,
+                trnN => 27+$addme,
+                trnQ => 28+$addme,
+                trnP => 29+$addme,
+                trnR => 30+$addme,
+                trnS_gcu => 31+$addme,
+                trnS_uga => 32+$addme,
+                trnT => 33+$addme,
+                trnV => 34+$addme,
+                trnW => 35+$addme,
+                trnY => 36+$addme,
+	};
+	return $retref;
+}
+	
+sub convert_table {
+my (@LoL_old, @LoL_new, @char_states, $aref, $key, $statelabels, $i, $j);
+while (<>) {  # = while <ARGV>
+        push @LoL_old, [ split ]; #using (omitting:) $_ variable
+}
+for $j (0 .. 74) {
+        for $i (0 .. $#LoL_old) {
+                $aref = $LoL_old[$i];
+                $char_states[$i] = shift @$aref;
+        }
+        my $ascii = 65;
+        my %used_states = ();
+        unless ($j == 0) {
+                for $i (0 .. $#char_states) {
+                        if (defined $used_states{$char_states[$i]}) {
+                                $char_states[$i] = $used_states{$char_states[$i]};
+                        }
+                        else {
+                                $used_states{$char_states[$i]} = chr($ascii);
+                                $char_states[$i] = chr($ascii);
+                                $ascii++;
+                        }
+                }
+                $statelabels .= "$j ";
+                foreach $key (sort { $used_states{$a} cmp $used_states {$b} } keys %used_states) {
+                        $statelabels .= "\'$key\' ";
+                }
+        $statelabels .= "\n";
+        }
+
+        $LoL_new[$j] = [ @char_states ];
+}
+for $aref (@LoL_new) {
+        print "@$aref \n";
+}
+print "STATELABELS\n$statelabels";
+

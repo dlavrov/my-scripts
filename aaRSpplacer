@@ -1,0 +1,130 @@
+#!/usr/bin/python
+
+import re
+import os
+import sys
+import json
+from subprocess import call
+from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
+
+def _decode_list(data):
+    rv = []
+    for item in data:
+        if isinstance(item, unicode):
+            item = item.encode('utf-8')
+        elif isinstance(item, list):
+            item = _decode_list(item)
+        elif isinstance(item, dict):
+            item = _decode_dict(item)
+        rv.append(item)
+    return rv
+
+def _decode_dict(data):
+    rv = {}
+    for key, value in data.iteritems():
+        if isinstance(key, unicode):
+            key = key.encode('utf-8')
+        if isinstance(value, unicode):
+            value = value.encode('utf-8')
+        elif isinstance(value, list):
+            value = _decode_list(value)
+        elif isinstance(value, dict):
+            value = _decode_dict(value)
+        rv[key] = value
+    return rv
+
+ranges = {}
+ranges['aars'] = [120,198]
+ranges['cars'] = [109,200]
+ranges['dars'] = [22,78]
+ranges['dars2'] = [107,153]
+ranges['ears'] = [112,150]
+ranges['eprs'] = [112,150]
+ranges['ears2'] = [210,258]
+ranges['farsa'] = [13,56]
+ranges['farsb'] = [165,217]
+ranges['fars2'] = [144,195]
+ranges['gars'] = [11,61]
+ranges['hars'] = [47,120]
+ranges['iars'] = [164,222]
+ranges['iars2'] = [64,111]
+ranges['kars'] = [141,225]
+ranges['lars'] = [20,76]
+ranges['lars2'] = [190,232]
+ranges['mars'] = [154,206]
+ranges['mars2'] = [43,94]
+ranges['nars'] = [26,80]
+ranges['nars2'] = [81,129]
+ranges['pars'] = [112,150]
+ranges['pars2'] = [192,241]
+ranges['qars'] = [60,111]
+ranges['rars'] = [180,245]
+ranges['rars2'] = [89,133]
+ranges['sars'] = [0,54]
+ranges['sars2'] = [180,232]
+ranges['tars'] = [34,127]
+ranges['vars'] = [76,160]
+ranges['wars'] = [17,71]
+ranges['wars2'] = [163,213]
+ranges['yars'] = [13,60]
+ranges['yars2'] = [148,194]
+
+ranges['gatA'] = [0,30]
+ranges['gatB'] = [0,1]
+
+fn = sys.argv[1]
+species = os.path.basename(fn).split(".")[0]
+handle = open(sys.argv[1], "rU")
+
+seqs = {}
+frags = {}
+for record in SeqIO.parse(handle, "fasta"):
+	fullaars = record.description.split("\t")[1]
+	aars = fullaars.replace("2","");
+	
+	if aars == "fars":
+		aars = "farsa"
+	if aars in ["ears","eprs","qars"]:
+		aars = "eqrs"
+	if aars not in seqs:
+		seqs[aars] = []
+	
+	record.id = species+"|"+fullaars.upper()+"|"+record.id
+	record.description = fullaars
+	seqs[aars].append(record)
+	frags[record.id] = record
+
+results = open(fn+".placed","w")
+outrecords = []
+base="/research/projects/aaRS/Pett_2014/trees/"
+for aars in sorted(seqs):
+	print("###")
+	print(aars.upper())
+	print("###")
+	directory = base+aars
+	if aars in ["pars","eqrs"]:
+		directory = base+"eqprs"
+	if aars in ["farsa","farsb"]:
+		directory = base+"fars"
+
+	outfile = directory +"/frags.fa"
+	outhandle = open(outfile, "w")
+	SeqIO.write(seqs[aars],outhandle,"fasta")
+	outhandle.close()
+	
+	alignbase = directory+"/"+aars
+	
+	call("mafft --addfragments "+outfile+" "+alignbase+".aln > "+alignbase+".frags.aln",shell=True)
+	call("aln2aln.py fasta stockholm "+alignbase+".frags.aln "+alignbase+".frags.sto",shell=True)
+	call("pplacer -s "+alignbase+".stats -t "+alignbase+".tre "+alignbase+".frags.sto -o "+alignbase+".jplace",shell=True)
+
+	jplace = open(alignbase+".jplace","rU")
+	j = json.load(jplace,object_hook=_decode_dict)
+	for p in j['placements']:
+		frag = frags[p['nm'][0][0]]
+		r = ranges[frag.description]
+		if p['p'][0][1] in range(r[0],r[1]+1):
+			outrecords.append(frag)
+
+SeqIO.write(outrecords,results,"fasta")

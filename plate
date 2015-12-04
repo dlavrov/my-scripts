@@ -1,0 +1,73 @@
+#!/usr/bin/perl -w
+
+use strict;
+use Spreadsheet::ParseExcel;
+
+my $file;
+
+unless(@ARGV){
+	die "plate - renames sequencing files in current directory based upon a table you provide in excel format\nUsage: plate <table.xls>\n";
+}
+
+$file = $ARGV[0];
+open FILE, "$file" or die "Couldn't open file '$file'\n";
+close FILE;
+
+
+my $parser   = Spreadsheet::ParseExcel->new();
+my $workbook = eval{ $parser->Parse($file)};
+die "Couldn't open file '$file'\n" if $@ or ! defined $workbook;
+
+my %names;
+my %columns;
+my %rows;
+
+for my $worksheet ( $workbook->worksheets() ) {
+
+	my ( $row_min, $row_max ) = $worksheet->row_range();
+	my ( $col_min, $col_max ) = $worksheet->col_range();
+
+	for my $row ( $row_min .. $row_max ) {	
+		for my $col ( $col_min .. $col_max ) {
+
+			my $cell = $worksheet->get_cell( $row, $col );
+			next unless $cell;
+
+			my $value = $cell->value();
+			
+			#print "$row\t$col\n";
+			
+			if($row == 0){
+				$columns{$col} = sprintf("%02d",$value) unless $value eq '';
+			}elsif($col == 0){
+				$rows{$row} = $value unless( $value eq '' || defined $rows{$row});
+			}else{
+				$names{$rows{$row}.$columns{$col}} = $value if defined $value;
+			}
+		}
+	}
+}
+
+foreach my $row (sort keys %rows){
+	foreach my $col (sort keys %columns){
+		my $prefix = $rows{$row}.$columns{$col};
+		
+		opendir(DIR, ".");
+		my @files = grep(/^$prefix/,readdir(DIR));
+		closedir(DIR);
+		
+		foreach(@files){
+			my $cf = $_;
+			$cf =~ /(\.\w+)$/;
+			my $ext = $1 ? $1 : '';
+			if($names{$prefix} ne ''){
+				my $name = $names{$prefix}.$ext;
+			
+				rename($_,$name);
+			}
+		}
+		
+	}
+}
+
+

@@ -1,0 +1,73 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+my ($startK,$dir,$name,@files) = @ARGV;
+
+my %test;
+open TEST, $files[0];
+my $qual = '';
+while(<TEST>){
+	if($_ =~ /^\+/){
+		my $line = <TEST>;
+		my @quals = split '', $line;
+		if(grep($_ =~ /([K-Z]|[\[\]\\\^_\`]|[a-h])/, @quals)){
+			$qual = '--illumina-quality';
+			last;
+		}elsif(grep($_ =~ /[\!\"\#\$\%\&\'\(\)\*\+\,\-\.\/\:\;\<\=\>\?]|[0-9]/, @quals)){
+			$qual = '--standard-quality';
+			last;
+		}
+	}
+}
+close TEST;
+
+my %N50;
+for(my $i = 0; $i < $startK*2 ; $i++){
+	$N50{$i} = 0;
+}
+
+my $K = $startK;
+# assemble the genome and get the N50 at startK
+$N50{$K} = assemble($K);
+my $lastK = $K;
+$K += $dir;
+# increase K and get the new N50
+$N50{$K} = assemble($K);
+
+# if the new N50 is not better, go the other direction
+if($N50{$K} < $N50{$lastK}){
+	$K = $lastK - $dir;
+	$dir *= -1;
+# if the new N50 is better, keep going in the same direction
+}else{
+	$lastK = $K;
+	$K += $dir;
+}
+# keep assembling for different K
+while($K > 0 && $K <= 96){
+	$N50{$K} = assemble($K);
+	
+	# if this K is better than the last, keep going
+	if($N50{$K} >= $N50{$lastK}){
+		$lastK = $K;
+		$K += $dir;
+	}else{
+		last;
+	}
+}
+
+sub assemble{
+	my $k = shift;
+
+	print("abyss-pe ABYSS_OPTIONS='$qual --coverage-hist=coverage.hist$k' q=10 np=8 k=$k in='@files' name=$name$k > $name$k.stdout");
+	eval{ open(N50, "N50.p $name$k-contigs.fa |")};
+	if($@){
+		close N50;
+		open(N50, "N50.p $name$k-3.fa |");
+	}
+	my $r = <N50>;
+	close N50;
+	return $r;
+}

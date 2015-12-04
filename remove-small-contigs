@@ -1,0 +1,23 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Bio::SeqIO;
+print "Please enter the cutoff length for contigs:\n";
+chomp (my $length = <STDIN>);
+
+foreach my $file (@ARGV){
+	my $io = Bio::SeqIO->new(-file => "$file", -format => 'fasta');
+	my $out = Bio::SeqIO->new(-file => ">$file.cleaned", -format => 'fasta');
+	my @seqs;
+	
+	while(my $seq = $io->next_seq){
+		$out->write_seq($seq) if ($seq->length > $length); 
+	}
+	#while(my $seq = $io->next_seq){
+	#	push @seqs, $seq;
+	#}
+	#foreach my $seq (sort @seqs){
+	#	$out->write_seq($seq) if ($seq->length > 150);
+	#}
+}

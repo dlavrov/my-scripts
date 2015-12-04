@@ -1,0 +1,48 @@
+#!/usr/bin/perl
+
+use strict;
+use Bio::SeqIO;
+
+unless(scalar(@ARGV) == 3){
+	print "remove short sequences from paired fastq files\nusage: trimfastq <min length> FILE1.fastq FILE2.fastq\n";
+}
+
+my $min = shift;
+
+my ($file1,$file2) = @ARGV;
+
+open FILE1, $file1;
+open FILE2, $file2;
+$file1 =~ /^([^\.]+)/;
+open OUT1, ">$1.trim$min.fastq";
+$file2 =~ /^([^\.]+)/;
+open OUT2, ">$1.trim$min.fastq";
+
+my $line = 0;
+my ($string1,$string2);
+my $out = 0;
+while(<FILE1>){
+	my $l1 = $_;
+	my $l2 = <FILE2>;
+	if($line < 3){
+		$string1 .= $l1;
+		$string2 .= $l2;
+		if($line == 1){
+			$out = (length($l1) >= $min && length($l2) >= $min) ? 1 : 0;
+		}
+		$line++;
+	}else{
+		$string1 .= $l1;
+		$string2 .= $l2;
+		print OUT1 $string1 if $out;
+		print OUT2 $string2 if $out;
+		$string1 = "";
+		$string2 = "";
+		$line = 0;
+		$out = 0;
+	}
+}
+close FILE1;
+close FILE2;
+close OUT1;
+close OUT2;

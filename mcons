@@ -1,0 +1,228 @@
+#! /usr/bin/perl -w
+use strict;
+use Bio::AlignIO;
+my $print_consensus=0;
+my $print_pairwise=0;
+my $get_stat=0;
+my $verbose=0;
+my $format = "";
+my $choice = 0;
+my $PRINT_DIFFERENT = 70; #used for printing names of tRNAs
+my $PRINT_IDENTICAL = 50;
+
+# Parse command-line options.
+#
+for (;;)
+{
+	die "Usage: mcons [-c -p -s -f{1-4}] alignment_file(s)\n" unless (@ARGV);
+   	my ($opt) = ($ARGV[0] =~ /^-(\w).*$/);
+	last unless $opt;
+	die "Invalid option: \"$opt\"!\n" unless $opt =~ /[cpsvf]/;
+	$print_consensus=1  if $opt eq "c"; #consensus
+        $print_pairwise=1  if $opt eq "p"; #pairwise comparisons
+	$get_stat=1 if $opt eq "s"; #statistics for tRNA genes NEEDS SPECIAL FORMAT!
+	$verbose=1 if $opt eq "v"; #verbose option for statistics; shows all frequences
+	($choice) = ($ARGV[0] =~ /^-f(\d).*$/) if $opt eq "f";
+	print STDERR "Format=$choice\n";
+        shift;
+        }
+while ($choice != 1 && $choice != 2 && $choice != 3 && $choice != 4) {
+print "Please specify file format:\n
+1 = fasta (default)
+2 = clustalw
+3 = nexus
+4 = phylip\n";
+chomp ($choice = <STDIN>);
+$choice = 1 unless $choice;
+print "Your choice is $choice\n";
+}
+if ($choice == 1) {$format = 'fasta'}
+elsif ($choice == 2) {$format = 'clustalw'}
+elsif ($choice == 3) {$format = 'nexus'}
+elsif ($choice == 4) {$format = 'phylip'}
+else {print "$choice is not a valid option!"}                  
+my $file = "";
+foreach $file (@ARGV) {
+	die "Can't read from file $file!\n" unless -r $file;
+
+	my $in = Bio::AlignIO -> new ( -file => $file, -format => $format );
+	my $aln = $in->next_aln();
+	print STDERR $aln->num_sequences, "\n";
+	print STDERR $aln->length, "\n";
+	print STDERR "same length of all sequences: ",
+	($aln->is_flush()) ? "yes" : "no", "\n";
+	if ($print_pairwise==1) {
+		my $length = $aln->length;
+		print "Percentage of pairwise identity for file \"$file\": \n";
+		print "               ";
+		foreach my $seq ( $aln->each_seq() ) {
+			my $id = $seq->id();
+			#if ($id) {
+			printf "%6.5s", $id;
+			#}
+			#else {print "no_seq";}
+		}
+		print "\n";
+		my $seq_number = $aln->num_sequences;
+		my ($n, $m);
+		for ($n=1; $n<$seq_number+1; $n++) {
+			my @id;
+			my $seq = $aln->get_seq_by_pos($n);
+			$id[0]= $seq->id();
+			for ($m=1; $m<$seq_number+1; $m++) {
+				if ($m == $n) {
+				$id[$m] = 100;
+				next;
+				}
+			my $aln2 = $aln->select_noncont($n, $m);
+			$aln2->gap_char('-');
+			my $match = $aln2->match_line();
+			print STDERR "$match";
+			my $consensus = $aln2->consensus_string(100);
+			$_=$consensus;
+			my $matches = tr/a-zA-Z//;
+			my $mismatches = tr/?//;
+			$id[$m] = 100*$matches/($matches+$mismatches) if ($matches || $mismatches);
+			#$id[$m] = $aln2->percentage_identity;
+		}
+		printf "%15.10s", shift @id;
+		foreach my $elem (@id) {
+			printf "%6.1f", $elem if $elem;
+			print "     " if !$elem;
+			}
+			print "\n";
+		
+		}
+	}
+	if ($print_consensus) { 
+		print "100% consensus:\n";
+		print $aln->consensus_string(100), "\n";
+		print "90% consensus:\n";
+		print $aln->consensus_string(90), "\n";
+		print "75% consensus:\n";
+		print $aln->consensus_string(75), "\n";
+		print "IUPAC consensus:\n";
+		print $aln->consensus_iupac(), "\n";
+	}
+	if ($get_stat) { #this is a very specific procedure, made to check of nucleotide identity of analogous/non-analogous tRNA genes
+                my $seq_number = $aln->num_sequences;
+                my ($n, $m);
+		my @same;
+		my @different;
+		my @same_names;
+		my @diff_names;
+		my %trnas;
+                for ($n=1; $n<$seq_number+1; $n++) {
+			print STDERR "\n";
+                        my $seq = $aln->get_seq_by_pos($n);
+			#my $name1 = $seq->id();
+			#$name1 =~ s/\w\w_(\w_\w\w\w).*/$1/; #for amoebidium only
+			my $name = $seq->id();
+			print STDERR "$name";
+			my ($species1,$name1) = $name =~ /(\w\w)_(\w_\w\w\w\S*)/;
+			#$name1 =~ s/\w\w_(\w_\w\w\w\S*).*/$1/;
+			$name1 = uc($name1);
+                        for ($m=1; $m<$n; $m++) {
+				print STDERR ".";
+				my $seq = $aln->get_seq_by_pos($m);
+                                my $name = $seq->id();
+				my ($species2,$name2) = $name =~ /(\w\w)_(\w_\w\w\w\S*)/;
+				#$name2 =~ s/\w\w_(\w_\w\w\w).*/$1/; #for amoebidium only
+				#$name2 =~ s/\w\w_(\w_\w\w\w\S*).*/$1/;
+				$name2 = uc($name2);
+                        	my $aln = $aln->select_noncont($n, $m);
+                        	my $consensus = $aln->consensus_string(100);
+				$_=$consensus;
+                        	my $matches = tr/a-zA-Z//;
+                        	my $mismatches = tr/?//;
+                        	my $identity = ($matches/($matches+$mismatches))*100 if ($matches || $mismatches);
+				$identity = sprintf ("%.1f", $identity);
+				#($name1 eq $name2) ? push (@same, $identity) : push (@different, $identity);
+				if ($name1 eq $name2) {
+					push (@same, $identity);
+					push (@{$trnas{$name1}}, $identity);
+					if ($identity < $PRINT_IDENTICAL) {
+						$same_names[$identity] .= "$species1||$species2||$name1 ";
+					}
+				}
+				elsif ($species1 eq $species2) {
+					push (@different, $identity); 
+					if ($identity >= $PRINT_DIFFERENT) {
+						$diff_names[$identity] .= "$species1||$name1||$name2  "
+					}
+					#push (@different, $identity);
+					#$diff_names[$identity] .= "$name1|$name2 " if ($identity >= $PRINT_DIFFERENCE);
+				}
+			}
+		}
+		#@same = sort { $a <=> $b } @same;
+		#@different = sort { $a <=> $b } @different;
+		my %same;
+		my %different;
+		my $same_average = 0;
+		my $diff_average = 0;
+		my $elem;
+		my $k;
+		my $nsame = 0;
+		my $ndiff = 0;
+		foreach $elem (@same) {
+			$same{$elem} ++;
+		}
+		foreach $elem (@different) {
+			$different{$elem} ++;
+		}
+		print STDERR "\n";
+		print "SAME\n";
+		foreach $k (sort { $a <=> $b} (keys %same)) {
+			print "$k\t$same{$k}\t";
+			if ($same_names[$k]) {
+				print "$same_names[$k]\n";
+			}
+			else {print "\n";}
+			$same_average += ($k*$same{$k});
+			$nsame += $same{$k};
+		}
+		$same_average = $same_average/$nsame if ($nsame); 
+		$same_average=sprintf "%5.1f", $same_average;
+		print "$nsame pairs of sequences: average similarity=$same_average\n";
+		
+		print "DIFFERENT\n";  
+		foreach $k (sort { $a <=> $b} (keys %different)) {
+			$diff_average += ($k*$different{$k});
+			$ndiff += $different{$k};
+			print "$k\t$different{$k}\t";
+			if ($diff_names[$k]) {
+				print "$diff_names[$k]\n";
+			}
+			else {
+				print "\n";
+			}
+		}
+		$diff_average = $diff_average/$ndiff if ($ndiff);
+		my $ss=0; #calculate sum of squares
+		foreach $k (sort { $a <=> $b} (keys %different)) {
+			$ss += ($k-$diff_average)**2*$different{$k};
+		}
+		my $sd = sqrt ($ss/$ndiff);
+		my $threesd = $diff_average + 3*$sd;
+		$diff_average=sprintf "%5.1f", $diff_average;
+		$sd =sprintf  "%5.1f", $sd;
+		$threesd = sprintf "%5.1f", $threesd;
+		print "$ndiff pairs of sequences: average similarity=$diff_average; SD=$sd; 3SD->$threesd\n";
+
+		print "INDIVIDUAL TRNAS: \n";
+		foreach $k (sort (keys %trnas)) {
+			my $trna_average=0;
+			foreach $elem (@{$trnas{$k}}) {
+				$trna_average += $elem;
+				}
+			my $count=scalar(@{$trnas{$k}});
+			$trna_average=$trna_average/$count;
+			$trna_average=sprintf "%5.1f", $trna_average;
+			print "$k $count pairs of sequences; average similarity=$trna_average\n";
+		}	
+					
+
+	}
+}
+print STDERR "Done!\n";

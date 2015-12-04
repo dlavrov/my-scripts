@@ -1,0 +1,21 @@
+#!/usr/bin/perl -w
+use strict;
+use warnings;
+use lib "/usr/local/lib/perl";     # see Chapter 6 about this module
+#unshift (@INC, "/usr/local/lib/perl"); # Prepend a directory name
+#print STDERR "@INC";
+use BeginPerlBioinfo;
+use File::Copy;
+my $gbdir="/research/seqlib/gbfiles/";
+getfiles($gbdir);
+sub getfiles {
+	my $gbdir = shift @_;
+	my @newnames="";
+	@newnames = `curl --disable-epsv  ftp://ftp.ncbi.nlm.nih.gov/genomes/MITOCHONDRIA/Metazoa/ -l`; #ftp://ftp.ncbi.nih.gov/genbank/genomes/MITOCHONDRIA/Metazoa/ -l`;
+	foreach my $file (@newnames) {
+		next if -e ($file);
+		system "curl -- ftp://ftp.ncbi.nlm.nih.gov/genomes/MITOCHONDRIA/Metazoa/$file > $file";
+	}
+	return;
+}
+

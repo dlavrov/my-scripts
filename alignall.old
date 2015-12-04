@@ -1,0 +1,10 @@
+#! /usr/bin/perl -w
+use strict;
+use warnings;
+foreach my $file (@ARGV) {                                                    
+        die "Can't read from file $file!\n" unless -r $file;               
+	#system "clustalw $file -output=PHY -outorder=input";  #clustalw command
+	#system "clustalw $file -output=PIR -outorder=input";  #clustalw command
+	system "clustalw $file -outorder=input";
+}
+print "Done!\n";

@@ -1,0 +1,69 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                            rename_trees                                   #
+$VERSION = "version 0.1";                                                   #
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 04/25/2010,                          #
+#############################################################################
+
+use strict;
+use warnings;
+
+# Perl libraries.
+#require "/usr/local/lib/perl/ogmp/subarray.pl";
+use File::Copy;
+my $outfile = "table.out";
+my $inrecord = "";
+my ($line, $species1, $species2);
+my (@all_names, @all_t, @all_S, @all_N, @all_dNdS, @all_dN, @all_dS, @genes);
+foreach my $fname (@ARGV) {
+	my (@t, @S, @N, @dNdS, @dN, @dS, @names);
+	push @genes, $fname;
+	#last unless defined ($fname);
+	open(IN,"<$fname") || die "Can't read from \"$fname\": $!\n";
+        my @all_lines = <IN>;
+	#while <IN>
+	close(IN) or die "Can't close $fname: $!\n";
+        open(OUT,">$outfile")|| die "Can't open \"$outfile\": $!\n";
+	#print "Processing $fname\n";
+	foreach $line (@all_lines) {
+		if ($line =~ /\d \(.*\) ... \d \(.*\)/) {
+		       ($species1, $species2) = ($line =~ /\d \((.+)\) ... \d \((.+)\)/);
+		       #$species1 =~ s/.._*(...).*_(.).*/$1_$2/; I commented out this replacement as it was designed for a certain naming scheme
+		       #$species2 =~ s/.._*(...).*_(.).*/$1_$2/;
+		       $species1 =~ s/(..)_(.)_.*/$1_$2/;
+		       $species2 =~ s/(..)_(.)_.*/$1_$2/;
+ 			push @names, ("$species1"."/"."$species2");		       
+		       $inrecord = "TRUE";
+	       }
+	       elsif ($line =~ /t=.+S=.+N=.+dN\/dS=.+dN.+dS.+/) {
+			my ($t, $S, $N, $dNdS, $dN, $dS) = ($line =~ /t=\s*(\S+)\s+S=\s*(\S+)\s+N=\s*(\S+)\s+dN\/dS=\s*(\S+)\s+dN\s*=\s*(\S+)\s+dS\s*=\s*(\S+)/);
+			push @t, $t;
+			push @S, $S;
+			push @N, $N;
+			push @dNdS, $dNdS;
+			push @dN, $dN;
+			push @dS, $dS;
+			#my @line = ($line =~ /t=\s*(\S+)\s+S=\s*(\S+)\s+N=\s*(\S+)\s+dN\/dS=\s*(\S+)\s+dN=\s*(\S+)\s+dS=\s*(\S+)/);
+			#print "$species1 ... $species2\n";
+			#print "$t\t$S\t$N\t$dNdS\t$dN\t$dS\n";
+		}
+		#else {shift;}
+	}
+	push @all_t, [ @t ];
+	push @all_S, [ @S ];
+	push @all_N, [ @N ];
+	push @all_dNdS, [ @dNdS ];
+	push @all_dN, [ @dN ];
+	push @all_dS, [ @dS ];
+	@all_names = @names;
+
+	#my $new_tree = Replace_names($tree,@species_names);
+	#print OUT "$new_tree\n";
+        close(OUT) or die "Can't close \"$outfile\": $!";
+}
+print "gene @all_names | @all_names | @all_names \n";
+for my $i (0 .. $#all_t) {
+	print "$genes[$i] @{$all_dN[$i]} | @{$all_dS[$i]} | @{$all_dNdS[$i]} \n";
+}

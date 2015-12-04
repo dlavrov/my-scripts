@@ -1,0 +1,58 @@
+#!/usr/bin/perl
+
+use Bio::SeqIO;
+
+my ($evalue,$query,$subject) = @ARGV;
+
+my (%queries,%subjects);
+my $in = Bio::SeqIO->new(-file => $query, -format => 'fasta');
+while(my $seq = $in->next_seq){
+	$queries{$seq->id} = $seq;
+}
+
+my %ios;
+foreach my $q (keys %queries){
+	$ios{$q} = Bio::SeqIO->new(-format => 'fasta', -file => ">$q.hits.fa");
+}
+
+$in = Bio::SeqIO->new(-file => $subject, -format => 'fasta');
+while(my $seq = $in->next_seq){
+	$subjects{$seq->id} = $seq;
+}
+
+open(FASTA,"fasta $query $subject |");
+my $query = '';
+my $hits = 0;
+my %found;
+while(<FASTA>){
+	my $line = $_;
+	if($line =~ />>>(\S+)/){
+		$query = $1;
+		$hits = 0;
+		next;
+	}	
+
+	if($line =~ /The best scores/){
+		$hits = 1;
+		next;
+	}
+
+	if($hits){
+		if($line =~ /^\S*$/){
+			$hits = 0;
+			next;
+		}else{	
+			$line =~ /^(\S+).+\[(r|f)\].+\s(\S+)$/;
+			my ($id,$strand,$e) = ($1,$2,$3);
+			next if $e > $evalue;
+			if($strand eq 'r'){
+				$ios{$query}->write_seq($subjects{$id}->revcom) unless $found{$id};
+				$found{$id}++;
+			}else{
+				$ios{$query}->write_seq($subjects{$id}) unless $found{$id};
+				$found{$id}++;
+			}
+		}
+	}
+}
+close FASTA;

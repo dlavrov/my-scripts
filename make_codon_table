@@ -1,0 +1,34 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                   codon_table                             #
+$VERSION=                       "version 1.0"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 03/22/2005,                          #
+#############################################################################
+
+use strict;
+my $file = shift();
+my %codons;
+open(IN, "$file") or die "Can't read $file: $!\n";
+while (<IN>) {
+	my ($codon, $fraction, $number);
+	next if ($_ !~ /^\w\w\w\s+\S\s+/);
+	($codon, $fraction, $number) = ($_ =~ /^(\w\w\w)\s+\S\s+(\d+\.\d+)\s+\d+\.\d+\s+(\d+)/);
+	$fraction = $fraction * 100;
+	my $value = $number;
+	#my $value = "$fraction ($number)";
+	$codons{$codon} = $value;
+	next;
+}
+my @order = ("T", "C", "A", "G");
+foreach my $first (@order) {
+	foreach my $third (@order) {
+		foreach my $second (@order) {
+			my $codon = $first . $second . $third;
+			print "$codon\t$codons{$codon}\t";
+		}
+		print "\n";
+	}
+}
+			

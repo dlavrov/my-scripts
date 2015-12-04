@@ -1,0 +1,24 @@
+#!/usr/bin/perl
+#############################################################################
+#                                  gb2map                                   #
+$VERSION = "version 1.0";                                                   #
+#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 03/13/2008,                          #
+##############################################################################
+#
+#This is just a wrapper for two programs
+#
+use strict;
+use warnings;
+my @files_to_use = @ARGV;
+die "Usage: gb2map <files_in_gbk_format>\n" unless @files_to_use;
+print "HERE are the files @files_to_use\n";
+foreach my $seq_file(@files_to_use) {
+	system "/usr/local/bin/cgview/cgview_xml_builder/cgview_xml_builder.pl -sequence $seq_file -output $seq_file.xml -tick_density 1 -orfs T -show_sequence_features T -feature_labels T";
+	system "java -jar -Xmx1500m /usr/local/bin/cgview/cgview.jar -i $seq_file.xml -o $seq_file.png -f png";
+	system "open $seq_file.png";
+	print ".";
+}
+print "Done!\n";

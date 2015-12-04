@@ -1,0 +1,39 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Bio::SeqIO;
+
+foreach my $file (@ARGV){
+	my $io = Bio::SeqIO->new(-file => $file, -format => 'fasta');
+	
+	my $count = 0;
+	my @lens;
+	my $size = 0;
+	while(my $seq = $io->next_seq){
+		$count++;
+		my $len = $seq->length;
+		push @lens, $len;
+		$size += $len;
+	}
+	
+	my $runningTotal = 0;
+	my $median = (sort {$a <=> $b} @lens)[int(scalar(@lens)/2)];
+	my $N50 = 0;
+	foreach my $len (sort {$a <=> $b} @lens){
+		$N50 = $len;
+		$runningTotal += $len;
+		last if $runningTotal > $size/2;
+	}
+	my @gN50 = grep($_ > $N50, @lens);
+	my $longest = (sort {$b <=> $a} @lens)[0];
+	my $mean = int($runningTotal*100/$count)/100;
+	print "$file:\n";
+	print "Number of contigs\t$count\n";
+	print "Median size\t\t$median\n";
+	print "Mean size\t\t$mean\n";
+	print "Max. size\t\t$longest\n";
+	print "N50\t\t\t$N50\n";
+	print "Number of contigs >N50\t".scalar(@gN50)."\n";
+	print "Sum\t\t\t$size\n\n";
+}

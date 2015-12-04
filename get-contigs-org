@@ -1,0 +1,24 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Bio::SeqIO;
+
+my $contigs = Bio::SeqIO->new(-file => $ARGV[0], -format => 'fasta');
+my $out = Bio::SeqIO->new(-file => ">$ARGV[1].out", -format => 'fasta');
+my $file = $ARGV[1];
+
+my @ids;
+open FILE, $file;
+while(<FILE>){
+	$_ =~ /^(\S+)/;
+	push @ids, $1;
+}
+close FILE;
+
+while(my $seq = $contigs->next_seq){
+	my $id = $seq->id;
+	$id = 0 unless defined $id;
+	$out->write_seq($seq) if grep($id eq $_, @ids);
+}

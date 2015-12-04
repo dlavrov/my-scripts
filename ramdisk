@@ -1,0 +1,10 @@
+#!/bin/sh
+let "size = $1*2048"
+set count = 0
+set name = ''
+while [ -d "/Volumes/ramdisk$name" ]
+do
+	let "count += 1"
+	let "name = $count"
+done
+diskutil erasevolume HFS+ "ramdisk$name" `hdiutil attach -nomount ram://$size`

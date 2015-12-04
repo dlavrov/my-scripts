@@ -1,0 +1,84 @@
+#! /usr/bin/perl
+
+use Bio::SeqIO;
+use File::Find;
+use Getopt::Long;
+
+my @formats = qw(emboss nexus fasta msf pfam phylip selex stockholm);
+
+
+my (@INFILES,$OUTFILE,$INFORMAT,$OUTFORMAT,$CONCAT,$R);
+
+if(@ARGV){
+	$R = GetOptions ("i=s{,}"=> \@INFILES,
+		"o=s"	=> \$OUTFILE,
+		"from=s"=> \$INFORMAT,
+		"to=s"	=> \$OUTFORMAT,
+		);
+	
+}else{
+	print_usage();
+}
+
+print_usage() unless $R;
+
+foreach my $INFILE (@INFILES){
+	$in  = Bio::SeqIO->new(-file => $INFILE,-format => $INFORMAT);
+	$out = Bio::SeqIO->new(-file => ">$OUTFILE",-format => $OUTFORMAT);
+	while(my $seq = $in->next_seq){
+		$out->write_seq($seq);
+	}
+}
+
+sub _find {
+    $category = shift;
+    return undef unless defined $category;
+
+    my $dir = File::Spec->catdir(split(/::/, $category));
+   
+    my @dirs;
+    if (defined @Module::Find::ModuleDirs) {
+        @dirs = map { File::Spec->catdir($_, $dir) }
+            @Module::Find::ModuleDirs;
+    } else {
+        @dirs = map { File::Spec->catdir($_, $dir) } @INC;
+    }
+    @results = ();
+
+    foreach $basedir (@dirs) {
+	next unless -d $basedir;
+
+        find({wanted   => \&_wanted,
+              no_chdir => 1}, $basedir);
+    }
+
+    # filter duplicate modules
+    my %seen = ();
+    @results = grep { not $seen{$_}++ } @results;
+
+    return @results;
+}
+
+sub _wanted {
+    my $name = File::Spec->abs2rel($_, $basedir);
+    return unless $name && $name ne File::Spec->curdir();
+    return unless /\.pm$/ && -r;
+    $name =~ s|\.pm$||;
+    $name = join('::', File::Spec->splitdir($name));
+    #$name =~ /::$category(.+)$/;
+    #push @results, $1;
+    push @results, $name;
+}
+
+
+
+sub print_usage{
+	my (@inputs,@outputs,$module);
+
+	my @formats = _find('Bio::SeqIO::');
+
+	print "seq2seq -i <infile(s)> -o <outfile> -from <input format> -to <output format>
+	available formats:\t@formats\n";
+	
+	exit;
+}

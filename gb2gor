@@ -1,0 +1,245 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                   gb2gor                                  #
+$VERSION=                       "version 1.2"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 31/05/2005,                          #
+#############################################################################
+#
+# Version 1.2 (31/05/2005) modifications to accommodate sponge mtDNA
+
+use strict;
+
+use Bio::Tools::GFF;
+use Bio::SeqIO;
+require "ogmp/gene_names.pl";
+my $progress="";
+my $no_trns=0;
+# Parse command-line options.
+
+for (;;)
+{
+    my ($opt) = ($ARGV[0] =~ /^-(t).*$/);
+    last unless defined($opt);
+    $no_trns=1  if ($opt eq "t");
+    shift;
+}
+
+for (;;) { # $seqfile (@ARGV) {
+	#my ($seqfile) = @ARGV;
+	my $fname = $ARGV[0];
+	last unless defined ($fname);
+	die("must define a valid seqfile to read") unless ( defined $fname && -r $fname);
+	my $seqio = new Bio::SeqIO(-format => 'genbank',
+			   -file   => $fname);
+	my $count = 0;
+	while( my $seq = $seqio->next_seq ) {
+    	$count++;
+    	# defined a default name
+	#my $sname = $seq->desc;
+	#$sname =~ s/^\s*([^ ]+) +([^ ]+).*/$1_$2/;
+	#$fname = sprintf("%s", $sname || $seq->display_id || "seq-$count");
+	$fname =~ s/(.+)\.gbk/$1/;
+    	my $gffout = new Bio::Tools::GFF(-file => ">$fname.temp" ,
+				     -gff_version => 2);
+    
+    	foreach my $feature ( $seq->top_SeqFeatures() ) {
+			$gffout->write_feature($feature);
+    		}
+		}
+
+	# Main program
+	
+	my $problems="";
+	my $gene_order = GetOrder($fname, \$problems);
+        ChkOrder($gene_order, \$problems) unless $no_trns;
+	$gene_order =~ s/[\+-]trn\S+\s?//g if $no_trns;
+	my $all_boundaries = GetBoundaries($gene_order, \$problems);
+	my $filename = $fname . ".go";
+	$filename = "CHECK_" . $filename if ($problems);
+	open(OUT, ">$filename") or die "Can't write to \"$filename\": $!\n";
+    
+    print OUT ";; The following problems were encountered:\n" if ($problems);
+    print OUT ";; $problems\n;;\n" if ($problems);
+    print OUT ";; This is the gene order for the gbk sequence $fname.gbk\n";
+    print OUT "$gene_order\n;;\n";
+    print OUT ";; These are the gene boundaries for the gbk sequence $fname.gbk\n;;\n";
+    print OUT ";;$all_boundaries\n";
+    close(OUT) or die "Can't close  $filename: $!";
+    $progress = $progress . ".";
+	print "$progress\n";
+	shift;
+	}
+print "\nDone!\n";
+
+sub ChkOrder {
+	my ($gene_order, $problemsref) = @_;
+	my %valid_genes = (
+		atp6 => 0,
+		atp8 => 0,
+		atp9 => 0,
+		cob => 0,
+		cox1 => 0,
+		cox2 => 0,
+		cox3 => 0,
+		nad1 => 0,
+		nad2 => 0,
+		nad3 => 0,
+		nad4 => 0,
+		nad4L => 0,
+		nad5 => 0,
+		nad6 => 0,
+		rnl => 0,
+		rns => 0,
+		trnA => 0,
+		trnC => 0,
+		trnD => 0,
+		trnE => 0,
+		trnF => 0,
+		trnG => 0,
+		trnH => 0,
+		trnI => 0,
+		trnI_cau => 0,
+		trnK => 0,
+		trnL_uaa => 0,
+		trnL_uag => 0,
+		trnM => 0,
+		trnM_cau_e => 0,
+		trnN => 0,
+		trnQ => 0,
+		trnP => 0,
+		trnR => 0,
+		trnR_ucu => 0,
+		trnS_gcu => 0,
+		trnS_uga => 0,
+		trnT => 0,
+		trnV => 0,
+		trnW => 0,
+		trnY => 0,
+	);
+	my @gene_order = split(/ /,$gene_order);
+	my $gene;
+	foreach  $gene (@gene_order) {
+		$gene =~ s/^\W(\S+)/$1/;
+		if ($gene =~ /\(\S+\)/) {
+			$gene =~ s/(\w+)\((\w+)\)/$1_$2/; #get rid of the brackets
+			$gene =~ s/(\w+_\w\w\w)(\w)/$1_$2/;
+		}
+		if (defined ($valid_genes{$gene})) {$valid_genes{$gene} += 1;}
+		else {$$problemsref = $$problemsref . ";; Unusual gene: $gene\n;;";}
+	}
+	foreach $gene (keys (%valid_genes)) {
+		unless ($gene =~ /trnI_cau|trnM_cau_e|trnR_ucu|atp9/) {  #These genes are "optional" for animal mtDNA
+		    $$problemsref = $$problemsref . "\n;;Gene $gene is present $valid_genes{$gene} times" if ($valid_genes{$gene} != 1);
+		}
+	}	
+	return;
+}
+
+	    
+sub GetOrder {
+# This subroutine determines gene order from a GFF2 file
+    my $fname = $_[0];
+    my $problemsref = $_[1];
+#    my $valid_genes = "atp6 atp8 cob cox1 cox2 cox3 nad1 nad2 nad3 nad4 nad4L nad5 nad6 rnl rns trnA trnC trnD trnE trnF trnG trnH trnI trnK trnLuaa trnLuag trnM trnN trnQ trnP trnR trnSgcu trnSuga trnT trnV trnW trnY";
+	my $TYPE=2;
+	my $POLARITY=6;
+	my $GENENAMES=8;
+	my $line;
+
+	open(IN,"<$fname.temp") || die "Can't read from \"$fname\": $!\n";
+	my @features = <IN>;
+	close(IN) or die "Can't close $fname: $!\n";
+
+	my $gene_order = "";
+	foreach $line (@features) {
+    		next if ($line !~ /^SEQ/);
+    		chomp $line;
+    		my @fields=split(/\t/, $line);
+    		grep(s/^\s+// && 0,@fields);  # Remove leading spaces
+    		grep(s/\s+$// && 0,@fields);  # Remove trailing spaces
+    		#grep(s/^-$//  && 0,@fields);  # Replace hashes by empty strings.
+		next if ($fields[$TYPE] !~ /CDS|rRNA|tRNA/i);
+		#next if ($fields[$TYPE] eq "gene")  && ($fields[$GENENAMES] =~ /(trn.)\(...\)|rns|rnl/);
+    	#This is a very rough translation for problematic genes; all other genes are handled by gene_names2 file
+    		if ($fields[$TYPE] eq "rRNA") {
+    			$fields[$GENENAMES] = "rns" if ($fields[$GENENAMES] =~ /small|12S|s-rRNA/i);
+    			$fields[$GENENAMES] = "rnl" if ($fields[$GENENAMES] =~ /large|16S|l-rRNA/i);
+    			}
+    		elsif ($fields[$TYPE] eq "tRNA") {
+			if ($fields[$GENENAMES] =~ /trnI\(cau\)/) {
+    				$fields[$GENENAMES] = "trnI(cau)";
+    				}
+			elsif ($fields[$GENENAMES] =~ /trnL|tRNA-Leu|tRNA(L)/) {
+				print "$fields[$GENENAMES]\n";
+    				$fields[$GENENAMES] = "trnL("."$1)" if ($fields[$GENENAMES] =~ /codons recognized:\s+(\w\w\w)/i);
+				$fields[$GENENAMES] = "$1" if ($fields[$GENENAMES] =~ /gene \"(trnL\(\w\w\w\))\"/);
+    				}
+			elsif ($fields[$GENENAMES] =~ /trnM\(cau\)e/) {
+				$fields[$GENENAMES] = "trnM(cau)e";
+			}
+			elsif ($fields[$GENENAMES] =~ /trnR\(ucu\)/) {
+				$fields[$GENENAMES] = "trnR(ucu)";
+			}
+    			elsif ($fields[$GENENAMES] =~ /trnS|tRNA-Ser|tRNA(S)/) {
+    				$fields[$GENENAMES] = "trnS("."$1)" if ($fields[$GENENAMES] =~ /codons recognized:\s+(\w\w\w)/i);
+				$fields[$GENENAMES] = "$1" if ($fields[$GENENAMES] =~ /gene \"(trnS\(\w\w\w\))\"/);
+			}
+			else {
+				$fields[$GENENAMES] = "$1" if (($fields[$GENENAMES] =~ /(trn.)\(...\)/) || ($fields[$GENENAMES] =~ /(tRNA-...)/));
+			}
+		}
+    		elsif ($fields[$TYPE] eq "CDS") {
+			$fields[$GENENAMES] ="$1" if ($fields[$GENENAMES] =~ /gene (\w+)/);
+		}
+		
+		my $gname = $fields[$GENENAMES];
+ 		#The following lines are very rough
+#    		$gname =~ s/^\w+\s+(\S+)\s*/$1/; #this removes "product" or "gene" from gname
+#    		$gname =~ s/;.*$//; #this removes comments after first ";" encountered
+#    		$gname =~s/"([^"]*)".*$/$1/;   #this removes quotes
+    	my $strand = $fields[$POLARITY];
+		if (&GENE_NAMES($gname)) {
+			$gname = &GENE_NAMES($gname);
+#			if ($valid_genes !~ /$gname/) {
+#				$$problemsref = $$problemsref . "Unusual gene: $gname\n";
+#				}
+			}
+		else {
+			$$problemsref = $$problemsref . "Could not figure out this gene: $gname!\n";
+			}
+		$gene_order = $gene_order.$strand.$gname." "; 
+		}
+	return $gene_order;
+	}
+	
+sub GetBoundaries {
+# This subroutine lists and reformats (if needed) all gene boundaries for a given gene order
+    my $gene_order = $_[0];
+    my $problemsref = $_[1];
+	my @all_genes = split(/ /,$gene_order);
+	my $gene_boundary="";
+	my $all_boundaries="";
+	my $upstream_gene="";
+	my $gene;
+	foreach $gene (@all_genes) {
+		if ($upstream_gene) {
+			$gene_boundary=$upstream_gene . $gene;
+			}
+		else {
+			$gene_boundary=$all_genes[$#all_genes].$gene; #last gene - first gene boundary
+			}
+		$gene_boundary =~ s/-([^-]+)-([^-]+)/+$2+$1/; #this turns around a "-,-" boundary
+		#the following two ifs deal with +- or -+ gene boundaries
+		if ($gene_boundary =~ /^\+([^-]+)-([^-]+)$/) {
+			$gene_boundary = "+$2-$1" if (($1 cmp $2) > 0);
+			}
+		if ($gene_boundary =~ /^-([^\+]+)\+([^-]+)$/) {
+			$gene_boundary = "-$2+$1" if (($1 cmp $2) > 0);
+			}
+		$upstream_gene=$gene;
+		$all_boundaries=$all_boundaries.$gene_boundary." ";
+		}
+	return $all_boundaries;
+	}

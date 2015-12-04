@@ -1,0 +1,36 @@
+#! /usr/bin/perl -w
+use strict;
+use warnings;
+my $program = "mafft";
+my $output_clustal = "fasta";
+my $output_mafft = "";
+my $choice =2;
+my $file = "";   
+
+# Parse command-line options.
+#
+for (;;) {
+        die "Usage: alignall [-mafft -clustalw  -o{1-4}] alignment_file(s), where 1=fasta 2=clustal 3=nexus 4=phylip\n" unless (@ARGV);
+        my ($opt) = ($ARGV[0] =~ /^-(\S+).*$/);
+        last unless $opt;
+        die "Invalid option: \"$opt\"!\n" unless ($opt eq "mafft" || $opt eq "clustalw" || $opt eq "fasta" || $opt =~ /^o/);
+        $program="clustalw"  if $opt eq "clustalw"; 
+        ($choice) = ($opt =~ /^o(\d).*$/) if $opt =~ /^o/;
+        shift;
+	}
+if ($choice == 1) {$output_clustal = 'fasta'}
+elsif ($choice == 2) {$output_clustal = 'clustalw'; $output_mafft = '--clustalout';}
+elsif ($choice == 3) {$output_clustal = 'nexus'}
+elsif ($choice == 4) {$output_clustal = 'phylip'; $output_mafft = '--phylipout';}
+else {die "$choice is not a valid option!\n"}
+
+# Do the alignment:
+
+foreach my $file (@ARGV) {
+	my $outfile = "$file.aln";	
+        die "Can't read from file $file!\n" unless -r $file;  
+	system "clustalw $file -output=$output_clustal -outorder=input" if $program eq "clustalw";  #clustalw command
+	system "mafft --auto $output_mafft $file > $outfile" if $program eq "mafft";
+	#system "clustalw $file -output=PIR -outorder=input";  #clustalw command
+}
+print "Done!\n";

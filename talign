@@ -1,0 +1,68 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                  talign                                   #
+$VERSION=                       "version 1.0"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 09/26/2005,                          #
+#############################################################################
+
+use strict;
+use warnings;
+
+# Perl libraries.
+require "/usr/local/lib/perl/ogmp/subarray.pl";
+use File::Copy;
+
+# Parse command-line options.
+# #
+die "Usage: talign sequence_file, where sequence_file contains aligned tRNAs in sequential phylip format\n" unless (@ARGV);
+my $infile = shift (@ARGV);
+print "Warning: only one argument is accepted by talign\n" if (@ARGV);
+die "Can't read from file $infile!\n" unless -r $infile;
+my $outfile = "$infile" . ".outfile";
+if (-e $outfile) {
+	print "Warning: output file $outfile already exist!  Creating a backup copy.\n";
+	my $backup_file = "$outfile" . ".bak";
+	copy($outfile, $backup_file);
+}
+my (%tRNA, %species);
+#get the species to use from local species.list
+my ($species, $tRNA, $sequence, $length);
+my $previous_sequence = 0;
+open(IN, "$infile") or die "Can't open \"$infile\": $!\n";
+while (my $line = <IN>) {
+	unless ($line =~ /^;/ || $line =~ /^ +;/) {
+		chomp($line);
+		($species,$tRNA,$sequence) = ($line =~ /^(\w\w)_(\S+)\s+(.+)/);
+		#print "Species: $species, tRNA: $tRNA, sequence: $sequence\n";
+		$sequence =~ s/\s//g;
+		if ($previous_sequence) {
+			die "Sequences are not aligned: check $species $tRNA\n" if (length$sequence != length$previous_sequence);
+		}
+		$previous_sequence = $sequence;
+		$length = length($sequence);
+		#print "Length: $length\n";
+		$tRNA{$tRNA}{$species} = $sequence;
+		$species{$species} = 1;
+	}
+}
+close(IN) or die "Can't close \"$infile\": $!\n";
+open (OUT, ">$outfile") or die "Can't write to $outfile: $!\n";
+my @species_names = (sort(keys(%species)));
+my @tRNA_names = (sort(keys(%tRNA)));
+foreach $species(@species_names) {
+	print OUT "$species\t";
+	foreach $tRNA(@tRNA_names) {
+		if ($tRNA{$tRNA}{$species}) {
+			print OUT $tRNA{$tRNA}{$species};
+		}
+		else {
+			print OUT '-' x $length;
+			print "tRNA $tRNA is absent for $species\n";
+		}
+	}
+	print OUT "\n";
+}
+
+close (OUT) or die "Can't close $outfile: $!\n";

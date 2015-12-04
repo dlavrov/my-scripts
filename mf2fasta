@@ -1,0 +1,34 @@
+#!/usr/bin/perl
+
+sub usage{
+print "usage:
+mf2fasta <masterfile>
+fasta output to STDOUT\n";
+exit;
+}
+
+&usage unless @ARGV;
+
+use File::Copy qw(copy);
+$new_file = "$ARGV[0]".".fa";
+copy $ARGV[0], $new_file;
+@args = ("cleanogmp", "-f", "$new_file");
+system(@args) == 0
+	or die "system @args failed: $?";
+
+
+#open FILE, $ARGV[0];
+#
+#while(<FILE>){
+#	if($_ =~ /^>/){
+#		print $_;
+#	}elsif($_ =~ /^;/){
+#	}else{
+#		my $line = $_;
+#		$line =~ s/\d+//g;
+#		$line =~ s/\s//g;
+#		print "$line\n" if($line =~ /\S/);
+#	}
+#}
+#
+#close FILE;

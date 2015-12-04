@@ -1,0 +1,56 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                   go2gr                                   #
+$VERSION=                       "version 0.2"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 12/04/2007,                          #
+#############################################################################
+#
+#This script converts a single fasta file into a grappa file, where gene names are replaced by numbers
+#
+use strict; 
+my $infile = $ARGV[0];
+die("must define a valid seqfile to read") unless ( defined $infile && -r $infile);
+my $outfile = "$infile.grappa";
+open(IN,"<$infile") || die "Can't read from \"$infile\": $!\n";
+my @lines = <IN>;
+close(IN) or die "Can't close \"$infile\": $!\n";
+
+my $gene_order = "";
+my $new_gene_order ="";
+my %keys;
+my $species;
+foreach my $line (@lines) {
+	if ($line =~ /^>/) {
+		$species = "$line";
+		$new_gene_order .= "$line";
+		next;
+	}
+        next if ($line =~ /^\s$/);
+	my @genes = split ' ', $line;
+	my $n;
+	unless (scalar %keys) {  #only for the first line
+	print STDERR "The following genes will be used for encoding: @genes\n";
+		for ($n=0; $n<@genes; $n++) {
+			#$genes[$n] =~ s/^[+-]//;
+			my $genename = $genes[$n];
+			$genename =~ s/^[+-]//;
+			$keys{$genename} = $n+1;
+			#print "$genename=$keys{$genes[$n]} ";
+		}
+	}
+        foreach my $gene (@genes) {
+		my $sign = ($gene =~ /^-/ ? "-" : "");
+		$gene =~ s/^[+-]//;
+		if ($keys{$gene}) {
+			$new_gene_order .= "$sign$keys{$gene} ";
+		}
+		else {
+			print STDERR "Gene $gene in $species will be ignored\n";
+		}
+	}
+	$new_gene_order .= "\n";
+}
+print "$new_gene_order\n";
+

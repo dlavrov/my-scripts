@@ -1,0 +1,41 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                   gb2mf                                   #
+$VERSION=                       "version 0.1"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 02/10/2012,                          #
+#############################################################################
+
+use strict;
+use Bio::SeqIO;                                                                                                          
+for (;;) { # $seqfile (@ARGV) {
+        #my ($seqfile) = @ARGV;
+        my $fname = shift @ARGV;
+        last unless defined ($fname);                                                                                      
+        die("must define a valid seqfile to read") unless ( defined $fname && -r $fname);                                  
+	my $in  = Bio::SeqIO->new('-file' => "$fname",                                                                       
+                         '-format' => 'genbank');                                                                           
+
+        $fname =~ s/(.+)\.gbk/$1/;                                                                                         
+	my $out = Bio::SeqIO->new('-file' => ">$fname.mf",                                                                     
+                         '-format' => 'mf');                                                                             
+	while ( my $seq = $in->next_seq() ) {$out->write_seq($seq); } 
+	}
+exit;
+#In addition, perl "tied filehandle" syntax is available to SeqIO,                                                          
+#allowing you to use the standard E<lt>E<gt> and print operations to read and                                               
+#
+#write sequence objects, eg:                                                                                                
+#
+#
+#
+#$in  = Bio::SeqIO->newFh('-file' => "inputfilename" ,                                                                    
+#
+#'-format' => 'Fasta');                                                                          
+#
+#$out = Bio::SeqIO->newFh('-format' => 'EMBL');                                                                           
+#
+#print $out $_ while <$in>;                                                                                               
+                                                                                                                           
+

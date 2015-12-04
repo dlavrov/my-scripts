@@ -1,0 +1,131 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                               read_paml_rates                             #
+$VERSION=                       "version 1.0"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 02/13/2011,                          #
+#############################################################################
+#
+#Program to read the rates file created by codeml and to recreate an alignment using different rates categories
+#To sort the sites use "sort -k5 -k4 temp > temp.sorted" command
+#
+
+use strict;
+my $sort_function=1;
+my $partitions=1;
+my $fraction=1;
+
+
+for (;;)
+{
+        die "Usage: read_pamlrates [-s{0-2} -p{1-4} -f{0-1]] paml_rates_file
+	where -s is the sort option -p is the partition option and -f is the fraction option.
+	You have to use the sort option in order to use the other two.
+	Example: read_pamlrates -s1 -f.75 rates > fasta75.phy (sort by category+rate, use 75% of sites)
+	The taxa names should be added from the original .phy file; convert to NEXUS using
+	tonexus fromfile=80taxa75.phy tofile=80taxa_75.nxs interleaved=yes command
+	_________________________________________________________________________________\n" unless (@ARGV);
+        my ($opt) = ($ARGV[0] =~ /^-(\w).*$/);
+        last unless $opt;
+	die "Invalid option: \"$opt\"!\n" unless $opt =~ /[spf]/;
+	#print "ARGV[0] = $ARGV[0]\n";
+	($sort_function) = ($ARGV[0] =~ /^-s(\d).*$/) if $opt eq "s";
+	($partitions) = ($ARGV[0] =~ /^-p(\d).*$/) if $opt eq "p";
+	($fraction) = ($ARGV[0] =~ /^-f(\.?\d+).*$/) if $opt eq "f";
+        shift;
+        }
+die "It does not make sense to use fractions or partitions if the data are note sorted\n" if ($sort_function==0 && ($partitions > 1 || $fraction < 1));
+my $file = shift();
+my @datafile;
+my @sorted_data;
+my @alignment;
+open(IN, "$file") or die "Can't read $file: $!\n";
+my $i=0;
+my $j=0;
+while (<IN>) {
+        my ($site, $freq, $data, $rate, $category);
+        next if ($_ !~ /^\s+\d+\s+\d+\s+\S+\s+\S+\s+\d+/);
+        ($site, $freq, $data, $rate, $category) = ($_ =~ /^\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\d+)/);
+	my $ref_to_hash = {
+		SITE => $site,
+		FREQ => $freq,
+		DATA => [ split //, $data ],
+		RATE => $rate,
+		CATEGORY => $category,
+	};
+	push @datafile, $ref_to_hash;
+}	
+if ($sort_function == 0) {
+	@sorted_data = @datafile;
+} 
+elsif ($sort_function == 1) {
+	@sorted_data = reverse sort sort_by_category_rate @datafile;
+}
+elsif ($sort_function == 2) {
+	@sorted_data = reverse sort sort_by_rate @datafile;
+}
+else {
+	die "wrong value for sort routine: use 1 to sort by category -> rate; use 2 to sort by rate only\n";
+}
+
+
+for $i (0 .. $#sorted_data) {
+	my $test_ref = $sorted_data[$i]{DATA};  ## I was not sure how to get the size of DATA field in the main array ;(
+	my @test_arr = @$test_ref;
+	for $j ( 0  .. $#test_arr) { 
+        	$alignment[$i][$j] = $sorted_data[$i]{DATA}[$j];   # convert the horizontal line into a vertical line}
+	}
+	$i++;
+}
+
+#@newAoA = ();
+#for ($startx = $x = 4; $x <= 8; $x++) {
+#    for ($starty = $y = 7; $y <= 12; $y++) {
+#        $newAoA[$x - $startx][$y - $starty] = $AoA[$x][$y];
+#    }
+#}
+
+
+
+my $total = $#alignment;
+my $total = $fraction*$total;
+my $_total = int ($total + 1);
+my $number_of_taxa = $#{$alignment[1]};
+my $_number_of_taxa = $number_of_taxa + 1;
+print "   $_number_of_taxa   $_total   I\n";
+my $start = 0;
+my $end = 59;
+while ( $end < $total ){
+	for $i (0 .. $number_of_taxa) {
+		for $j ($start .. $end) {
+			print "$alignment[$j][$i]";
+		}
+		print "\n";
+	}
+	print "\n";
+	$start = $end + 1;
+	$end = $end +60;
+}
+
+if ($start < $total) {
+	for $i (0 .. $number_of_taxa) {
+		for $j ($start .. $total) {
+			print "$alignment[$j][$i]";
+		}
+		print "\n";
+	}
+	print "\n";
+}
+print STDERR "I'm done! Hurray to Lydia!\n";
+
+##############SUBS##############
+sub sort_by_category_rate {
+    $b->{CATEGORY}    <=>  $a->{CATEGORY}
+        ||
+    $b->{RATE}    <=>  $a->{RATE}
+}
+
+sub sort_by_rate {
+	$b->{RATE}    <=>  $a->{RATE}                                                                                                         
+}  

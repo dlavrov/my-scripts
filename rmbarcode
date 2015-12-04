@@ -1,0 +1,13 @@
+#!/usr/bin/perl -w
+use strict;
+use warnings;
+#use Tie::File; alternative
+my $barcode;
+print STDERR "Please specify the barcode length (12):\n";
+chomp ($barcode = <STDIN>);
+$barcode = 12 unless $barcode;
+print STDERR "Barcode length: $barcode\n";
+while (<>) {
+	$_ =~ s/.{$barcode}(.*)/$1/ unless (/^[\@\+]/);
+	print "$_";
+}

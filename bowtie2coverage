@@ -1,0 +1,49 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+my %revcom = ('A' => 'T',
+			  'G' => 'C',
+			  'C' => 'G',
+			  'T' => 'A',
+			  'N' => 'N');
+
+my %data;
+my ($file,$thresh) = @ARGV;
+open FILE, $file;
+
+while(<FILE>){
+	$_ =~ /(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)?/;
+	my ($strand,$contig,$pos,$read,$qual) = ($1,$2,$3,$4,$5);
+	my @quals = split '', $qual;
+	my @reads = split '', $read;
+	#next unless $strand eq '-';
+	if($strand eq '-'){
+		@quals = reverse(@quals);
+		#print "@reads\n";
+		@reads = reverse(@reads);
+		#print "@reads\n\n";
+	}
+	for(my $i=0; $i < scalar(@reads);$i++){
+		my $spos = $strand eq '-' ? scalar(@reads) - 1 - $i : $i;
+		if($quals[$i] =~ /[A-J]/){
+			$data{$contig}{$pos+$spos}{$reads[$i]}++;
+		}
+	}
+}
+
+#my $seq = '';
+foreach my $contig (keys %data){
+	foreach my $pos (sort {$a <=> $b} keys %{$data{$contig}}){
+		my $line = "$contig\t$pos";
+		foreach my $nuc (qw(A G C T)){
+			$data{$contig}{$pos}{$nuc} = 0 unless defined $data{$contig}{$pos}{$nuc};
+			$line .= "\t$data{$contig}{$pos}{$nuc}";
+		}
+		print "$line\n";
+	}
+}
+
+#print "$seq\n";
+

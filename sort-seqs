@@ -1,0 +1,18 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Bio::SeqIO;
+
+foreach my $file (@ARGV){
+	my $io = Bio::SeqIO->new(-file => "$file", -format => 'fasta');
+	my $out = Bio::SeqIO->new(-file => ">$file.sorted", -format => 'fasta');
+	my @seqs;
+	
+	while(my $seq = $io->next_seq){
+		push @seqs, $seq;
+	}
+	foreach my $seq (sort {$b->length <=> $a->length} @seqs){
+		$out->write_seq($seq);
+	}
+}

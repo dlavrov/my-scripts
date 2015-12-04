@@ -1,0 +1,18 @@
+#!/usr/bin/perl
+# get multiple contigs by a list of names
+use strict;
+use warnings;
+
+use Bio::SeqIO;
+
+my $contigs = Bio::SeqIO->new(-file => shift, -format => 'fasta');
+
+my @ids = @ARGV;
+
+while(my $seq = $contigs->next_seq){
+	my $id = $seq->id;
+	$id = 0 unless defined $id;
+	if(grep($id eq $_, @ids)){
+		print ">".$seq->id."\t".$seq->description."\n".$seq->seq."\n";
+	}
+}

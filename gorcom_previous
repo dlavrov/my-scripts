@@ -1,0 +1,87 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                   gorcom                                  #
+$VERSION=                       "version 1.0"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 10/14/2001,                          #
+#############################################################################
+
+use strict;
+my $print_shared=0;
+my $print_unique=0;
+my $print_count=0;
+
+# Parse command-line options.
+
+for (;;)
+{
+    my ($opt) = ($ARGV[0] =~ /^-([usc]).*$/);
+    last if $opt eq "";
+    $print_unique=1  if $opt eq "u";
+    $print_shared=1  if $opt eq "s";
+    $print_count=1   if $opt eq "c";
+    shift;
+}
+
+#($LoG) = ($0 =~ m#([^/]+)$#);
+#system("echo `date +%y-%m-%d,%H:%M:%S` \$USER $LoG >>/usr/local/log/ogmplog");
+
+
+my $file = shift();
+my @files_to_compare = @ARGV;
+my $line;
+my $shared = "";
+my $unique = "";
+&usage if @files_to_compare <1;
+open(IN, "$file") or die "Can't read $file: $!\n";
+while (<IN>) {
+	next if /^;/;
+	chomp($line = $_);
+	last;
+	}
+close(IN) or die "Can't close $file: $!\n";
+my @first_genome = split(/ /,$line);
+@first_genome = sort(@first_genome);
+
+foreach my $file2 (@files_to_compare) {
+	die("must define a valid seqfile to read") unless ( defined $file2 && -r $file2);
+	open(IN, "$file2") or die "Can't read $file2: $!\n";
+	while (<IN>) {
+		next if /^;/;
+		chomp($line = $_);
+		last;
+		}
+	close(IN) or die "Can't close $file2: $!\n";
+	my @second_genome = split(/ /,$line);
+	@second_genome = sort(@second_genome);
+	my $boundary_one;
+	my $boundary_two;
+	#print "My first genome: @first_genome\n";
+	#print "My second genome: @second_genome\n";
+	$shared .= "\n;+++++++++++ $file : $file2 ++++++++++++\n";
+	$unique .= "\n;+++++++++++ $file2 : $file ++++++++++++\n";
+	my $number_shared = 0;
+	LOOP1: foreach $boundary_one(@second_genome) {
+		LOOP2: foreach $boundary_two(@first_genome) {
+			if ($boundary_one eq $boundary_two) {
+				$shared .= "$boundary_two ";
+				$number_shared++; #count the number of shared boundaries
+				next LOOP1;
+			}
+		}
+		$unique .= "$boundary_one ";
+	}
+	#if ($number_shared != 1) {$shared .= "\n$number_shared boundaries are shared\n";}
+	#else {$shared .= "\n$number_shared boundary is shared\n";}
+	#$shared .= "$number_shared "; ## this was used to get just the numbers
+}
+
+print "\nShared boundaries:\n$shared\n" if (!$print_unique && !$print_count && !$print_shared);
+print "\nShared boundaries:\n$shared\n" if ($print_shared);
+print "\nUnique boundaries:\n$unique\n" if ($print_unique);
+
+sub usage {
+	print "Usage: gorcom [-s -u -c] file file(s)\n";
+	exit;
+	}

@@ -1,0 +1,121 @@
+#! /usr/bin/perl
+use strict;
+
+my $gfile = $ARGV[0];
+
+open FILE, $gfile;
+
+my %seqs;
+my $struct;
+
+while(<FILE>){
+	if($_ =~ /^\#=GC SS_cons\s+(\S+)/){
+		$struct .= $1;
+	
+	}elsif($_ =~ /^[\# ]/){
+		
+	
+	}elsif($_ =~ /^(\S+)\s+(\S+)/){
+		$seqs{$1} .= $2;
+	}
+	
+
+}
+
+close FILE;
+
+$struct = join ' ', (split '', $struct);
+#$struct =~ s/[\{\[\(]/</g;
+#$struct =~ s/[\}\]\)]/>/g;
+#$struct =~ s/[\,\:\_\-]/\./g;
+
+my ($ali,$doms,$i);
+$i = 10;
+
+while($i < length((values %seqs)[0])){
+	$ali .= sprintf("%19s ",$i);
+	$i += 10;
+}
+$ali .= "\n";
+$i = 0;
+while($i < length((values %seqs)[0])){
+	$ali .= '. . . . | ';
+	$i += 5;
+}
+$ali .= "\n";
+
+
+my %match = ( '{' => '}', '}' => '{',
+			  '[' => ']', ']' => '[',
+			  '<' => '>', '>' => '<',
+			  '(' => ')', ')' => '(' );
+
+my $doms;
+foreach my $seq (sort keys %seqs){
+	$seqs{$seq} =~ s/\./-/g;
+	$seqs{$seq} = join ' ', (split '', $seqs{$seq});
+	$seqs{$seq} = uc($seqs{$seq});
+	
+	my $open;
+	my $loop;
+	
+	my @stack;
+	my $d = 1;
+	
+	$doms = '- ' x length($struct);
+	
+	for(my $i=0;$i<length($struct);$i++){
+		if( !defined $open && substr($struct,$i,1) =~ /[\{\(\<\[]/){
+			$open = substr($struct,$i,1);
+			substr($seqs{$seq},$i-1,1) = '[';
+			
+			substr($doms,$i,1) = $d;
+			unshift @stack, $d++;
+		}elsif(defined $open){
+			if(substr($struct,$i,1) =~ /[\{\(\<\[\}\)\>\]]/ && substr($struct,$i,1) ne $open){
+				$open = substr($struct,$i,1);
+				if(substr($struct,$i-2,1) =~ /[\{\(\<\[\}\)\>\]]/){
+					substr($seqs{$seq},$i-1,1) = '^';
+				}else{
+					substr($seqs{$seq},$i-1,1) = '[';
+					$$loop = ']' if defined $loop;
+					undef $loop;
+				}
+				if($open =~ /[\{\(\<\[]/ && substr($struct,$i,1) =~ /[\{\(\<\[]/){
+					substr($doms,$i,1) = $d;
+					unshift @stack, $d++;
+				}elsif($open =~ /[\}\)\>\]]/ && substr($struct,$i,1) =~ /[\{\(\<\[]/){
+					substr($doms,$i,1) = $d++;
+				}elsif($open =~ /[\{\(\<\[]/ && substr($struct,$i,1) =~ /[\}\)\>\]]/){
+					substr($doms,$i,1) = (shift @stack)."\'";
+				}elsif($open =~ /[\}\)\>\]]/ && substr($struct,$i,1) =~ /[\}\)\>\]]/){
+					substr($doms,$i,1) = (shift @stack)."\'";
+				}
+			}elsif(substr($struct,$i,1) =~ /[\{\(\<\[\}\)\>\]]/ && substr($struct,$i,1) eq $open && defined $loop){
+				$$loop = '{';
+				substr($seqs{$seq},$i-1,1) = '}';
+				undef $loop;
+			}elsif(substr($struct,$i,1) =~ /[\.\,\:\-\_]/ && !defined $loop){
+				$loop = \substr($seqs{$seq},$i-1,1);
+			}
+		}
+	
+	}
+	
+	$$loop = ']';
+	
+	$ali .= $seqs{$seq}."\t$seq\n";
+}
+
+substr($doms,length($struct)) = '';
+$ali .= "$doms\tHelix Numbering\n";
+
+open FILE, ">$gfile.ali";
+
+print FILE $ali;
+
+close FILE;
+
+
+
+

@@ -1,0 +1,34 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                   mpepper                                 #
+$VERSION=                       "version 0.1"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 12/02/2004,                          #
+#############################################################################
+
+use strict;
+  
+for (;;) { # $seqfile (@ARGV) {
+        my $fname = shift @ARGV;
+        last unless defined ($fname);                                                                                      
+        die("must define a valid seqfile to read") unless ( defined $fname && -r $fname);                                  
+	system "pepper -t $fname"
+	}
+exit;
+#In addition, perl "tied filehandle" syntax is available to SeqIO,                                                          
+#allowing you to use the standard E<lt>E<gt> and print operations to read and                                               
+#
+#write sequence objects, eg:                                                                                                
+#
+#
+#
+#$in  = Bio::SeqIO->newFh('-file' => "inputfilename" ,                                                                    
+#
+#'-format' => 'Fasta');                                                                          
+#
+#$out = Bio::SeqIO->newFh('-format' => 'EMBL');                                                                           
+#
+#print $out $_ while <$in>;                                                                                               
+                                                                                                                           
+

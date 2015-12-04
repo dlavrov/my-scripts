@@ -1,0 +1,33 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Bio::SeqIO;
+
+my $gbdir = shift;
+
+#system("updategb2");
+foreach my $file (<$gbdir/*.gbk>){
+	my $io = Bio::SeqIO->new(-format => "genbank", -file => $file);
+	my $seq = $io->next_seq;
+	
+	if(!defined $seq){
+		system("rm $file");
+		next;
+	}
+
+	system("gb2mf $file");
+	my $acc = $seq->accession;
+	my @class = $seq->species->classification;
+	my $phylum = $class[-3];
+	my $genus = $class[1];
+	my $species = $class[0];
+	if($species =~ /\S+\s\S+/){
+		$species =~ s/\s/_/g;	
+	}else{
+		$species = $genus."_".$species;
+	}
+	print "mv $acc.mf ".uc(substr($phylum,0,2))."_$species.mf\n";
+	system("mv $acc.mf ".uc(substr($phylum,0,2))."_$species.mf");
+}

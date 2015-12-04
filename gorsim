@@ -1,0 +1,138 @@
+#!/usr/bin/perl -w
+use strict;
+
+my $number = 100;
+my $file = shift();
+my @files_to_compare = @ARGV;
+my $line;
+&usage if @files_to_compare <1;
+open(IN, "$file") or die "Can't read $file: $!\n";
+while (<IN>) {
+        next if /^;/;
+        chomp($line = $_);
+        last;
+        }
+close(IN) or die "Can't close $file: $!\n";
+
+my @first_genome = split(/ /,$line);
+my @genes_to_permute = @first_genome;
+my $boundary;
+foreach $boundary (@genes_to_permute) { 
+	$boundary =~ s/^(\+|-)[^\+|-]+((\+|-)[^\+|-]+)/$2/; 
+	print "$boundary\n";
+} #this is bad because of sorting.  Will work only when all genes are transcribed from the same strand
+print "@genes_to_permute";
+my $valid_genes = join ' ', @genes_to_permute;
+
+print "Please enter the number of simulations ($number):\n";
+chomp (my $choice = <STDIN>);
+$number = $choice if $choice;
+my($average, $max_number) = &gorcom(\@first_genome, \@files_to_compare);
+print "Average/muxnumber: $average $max_number\n";
+my($new_average, $new_max_number) = &permute($number, \@genes_to_permute, \@files_to_compare, $average, $max_number);
+
+print "Done!\n
+The average number of shared gene boundaries was exceeded in $new_average percent of simulations
+The maximum number of shared gene boundaries was exceeded in $new_max_number percent of simulations\n";
+# End of main program
+
+sub gorcom { #compares gene orders and returns the max and average number of shared gene goundaries
+	my ($first_genome_ref, $files_to_compare_ref) = @_;
+	my @first_genome = @$first_genome_ref;
+	my @files_to_compare = @$files_to_compare_ref;
+	my $max_number = 0;
+	my $average = 0;
+	@first_genome = sort(@first_genome);
+	foreach my $file2 (@files_to_compare) {
+        	die("must define a valid seqfile to read") unless ( defined $file2 && -r $file2);
+		open(IN, "$file2") or die "Can't read $file2: $!\n";
+        	while (<IN>) {
+                	next if /^;/;
+                	chomp($line = $_);
+                	last;
+                	}
+        	close(IN) or die "Can't close $file2: $!\n";
+        	my @second_genome = split(/ /,$line);
+        	@second_genome = sort(@second_genome);
+        	my $boundary_one;
+        	my $boundary_two;
+        	my $number_shared = 0;
+        	LOOP1: foreach $boundary_one(@second_genome) {
+                	LOOP2: foreach $boundary_two(@first_genome) {
+                        	if ($boundary_one eq $boundary_two){
+					$number_shared++;
+                                	next LOOP1;
+				}
+			}
+		}                                                                            
+        	$max_number = $number_shared if ($number_shared > $max_number);                      
+        	$average += $number_shared;
+		print "$number_shared\n";
+	}                                                                                            
+	$average /= scalar(@files_to_compare);                                                       
+	return ($average, $max_number);
+} #end of sub gorcom
+
+sub permute {
+	my ($number, $genes_to_permute_ref, $files_to_compare_ref, $real_average, $real_max_number) = @_;
+	my @orig_order = @$genes_to_permute_ref;
+	print "@orig_order";
+	#my $orig_boundaries_ref = GetBoundaries($gene_order);
+	#my @orig_boundaries=@$orig_boundaries_ref;
+	my ($i, $m);
+	my $more_than_average = 0;
+	my $more_than_max = 0;
+	srand(time|$$); #seed random number generator
+	for ($i = 0; $i < $number; $i++) {
+		my @temp_order = reverse(@orig_order);
+		my @new_order = ();
+		while (@temp_order > 0) {
+			my $m = int(rand(scalar @temp_order));
+			push @new_order, $temp_order[$m];
+			$temp_order[$m] = $temp_order[$#temp_order];
+			pop @temp_order;
+			}
+		my $new_gene_order = join ' ', @new_order;
+		#print "@new_order";
+		my $new_boundaries_ref = GetBoundaries($new_gene_order);
+		my($average, $max_number) = &gorcom($new_boundaries_ref, $files_to_compare_ref);
+		$more_than_average++ if ($average >= $real_average);
+		$more_than_max++ if ($max_number >= $real_max_number);
+	}
+$more_than_average = $more_than_average/$number*100;
+$more_than_max = $more_than_max/$number*100;
+return ($more_than_average, $more_than_max);
+}
+
+sub GetBoundaries {
+# This subroutine lists and reformats (if needed) all gene boundaries for a given gene order
+    my $gene_order = $_[0];
+    my $problemsref = $_[1];
+	my @all_genes = split(/ /,$gene_order);
+	my $gene_boundary="";
+	my @all_boundaries;
+	my $upstream_gene="";
+	foreach my $gene (@all_genes) {
+		if ($upstream_gene) {
+			$gene_boundary=$upstream_gene . $gene;
+			}
+		else {
+			$gene_boundary=$all_genes[$#all_genes].$gene; #last gene - first gene boundary
+			}
+				#I have disabled different transcriptional polarity for the time being
+				#$gene_boundary =~ s/-([^-]+)-([^-]+)/+$2+$1/; #this turns around a "-,-" boundary
+				#the following two ifs deal with +- or -+ gene boundaries
+				#if ($gene_boundary =~ /^\+([^-]+)-([^-]+)$/) {
+				#	$gene_boundary = "+$2-$1" if (($1 cmp $2) > 0);
+				#	}
+				#if ($gene_boundary =~ /^-([^\+]+)\+([^-]+)$/) {
+				#	$gene_boundary = "-$2+$1" if (($1 cmp $2) > 0);
+				#	}
+
+		$upstream_gene=$gene;
+		push @all_boundaries, $gene_boundary;
+		}
+	return \@all_boundaries;
+	}
+
+

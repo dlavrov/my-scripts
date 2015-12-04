@@ -1,0 +1,84 @@
+#!/usr/bin/perl -w
+use strict;
+use warnings;
+use lib "/usr/local/lib/perl";     # see Chapter 6 about this module
+#unshift (@INC, "/usr/local/lib/perl"); # Prepend a directory name
+#print STDERR "@INC";
+use BeginPerlBioinfo;
+use File::Copy;
+my $gbdir="/research/seqlib/gbfiles/";
+getfiles($gbdir);
+sortfiles($gbdir);
+sub getfiles {
+	my $gbdir = shift @_;
+	my $orgdir = $gbdir . "org/";
+	my $newdir = $gbdir . "new/";
+	my @newnames="";
+	mkdir $newdir unless -d $newdir;
+	@newnames = `curl --disable-epsv  ftp://ftp.ncbi.nlm.nih.gov/genomes/MITOCHONDRIA/Metazoa/ -l`; #ftp://ftp.ncbi.nih.gov/genbank/genomes/MITOCHONDRIA/Metazoa/ -l`;
+	foreach my $file (@newnames) {
+		next unless $file =~ s/^(NC_\d+.gbk).*$/$1/;
+		chomp $file;
+		next if -e ("$orgdir"."$file");
+		system "curl -- ftp://ftp.ncbi.nlm.nih.gov/genomes/MITOCHONDRIA/Metazoa/$file > $newdir$file";
+	}
+	return;
+}
+sub sortfiles {
+# Declare and initialize variables
+	my $gbdir = shift @_;
+	my $orgdir = $gbdir . "org/";
+	my $newdir = $gbdir . "new/";
+	my $sortdir = $gbdir . "gbk/";
+	my $fh;
+	my $record;
+	my $dna;
+	my $annotation;
+	my %fields;
+	my $seqfile;
+	opendir(DIR,"$newdir") || die "no $newdir : $!";
+	my @files = (sort readdir(DIR));# list context, sorted
+	closedir(DIR);
+	if (@files > 0) {
+		my $sendmail = 0;
+		my $mailfile = $newdir . "temp";
+		#open(OUT,">>$logfile");
+		open(OUT2, ">$mailfile");
+		(undef,undef,undef,my $day,my $month,my $year) = localtime();
+		$year += 1900;
+		my $datestring = $year . "-" . sprintf("%02d",($month+1)) . "-" . sprintf("%02d",$day);
+		print OUT2 "gb database updated!\n";
+		print OUT2 "Updated $datestring\n";
+		foreach $seqfile (@files) {
+			next unless $seqfile =~ /^\d+.gbk/;
+			$sendmail = 1;
+			my $newfile = $newdir.$seqfile;
+			#my $fname;
+        		die("must define a valid seqfile to read") unless ( defined $newfile && -r $newfile);
+        		$fh = open_file($newfile);
+        		$record = get_next_record($fh);
+        		# Parse the sequence and annotation
+        		($annotation, $dna) = get_annotation_and_dna($record);
+        		# Extract the fields of the annotation
+        		%fields = parse_annotation($annotation);
+        		# Print the fields
+        		my ($kingdom, $phylum, $class) = ($fields{SOURCE} =~ /Eukaryota;\s+(\w+);\s+(\w+);\s+(\w+);/);
+        		my ($gname, $sname) = ($fields{DEFINITION} =~ /DEFINITION\s+(\w+)\s+(\w+)/);
+        		my $sortfile = ($phylum || "XXX") . "_" . ($gname || "XXX") . "_" . ($sname || "XXX") . ".gbk";
+			$sortfile = $sortdir . $sortfile;
+			my $orgfile = $orgdir . $seqfile;
+			print $orgfile;
+        		copy ($newfile, $sortfile) unless (-e $sortfile);
+			move ($newfile, $orgfile);
+			print OUT2 "New sequence: phylum: $phylum, class: $class, species: $gname $sname\n";
+		}
+	print OUT2 "./n";
+	#close OUT;
+	close OUT2;
+	system 'mail dlavrov@iastate.edu < /research/seqlib/gbfiles/new/temp' if $sendmail;
+	#unlink $mailfile;
+	}
+	return;
+}
+print "Done!\n";
+

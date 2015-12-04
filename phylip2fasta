@@ -1,0 +1,5 @@
+perl -pi.bak -e 's/^(.{10})/>\1\n/' *.seq #converts to fasta 
+perl -pi -e 's/^\d+ +\d+\n//' *.seq #removes the first line
+perl -pi -e 's/-+//g' *.seq # removes gaps; eote "g" for global
+mkdir BAK
+mv *.bak BAK

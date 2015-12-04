@@ -1,0 +1,6 @@
+#!/bin/sh
+mkdir /ngs/$1
+mkdir /ngs/$1/assembly
+mkdir /ngs/$1/analysis
+mkdir /Volumes/raw/$1
+ln -s /Volumes/raw/$1 /ngs/$1/raw

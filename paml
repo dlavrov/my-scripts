@@ -1,0 +1,28 @@
+#! /usr/bin/perl -w
+use File::Copy;
+use strict;
+for (;;) { # $seqfile (@ARGV)
+	my ($infile) = $ARGV[0];
+	chomp $infile;
+	my $file=$infile; 
+	$file=~ s/(.*)\..*/$1/;
+	print "PROCESSING FILE: $file\n";
+	my $codeml_outfile="$file"."_codeml.res";
+	my $baseml_outfile = "$file"."_baseml.res";
+	my $fourfold_outfile = "$file"."_4fold.res";
+	copy($infile, "codeml.infile") or die "$?";
+	system ("codeml") == 0 or die "codeml failed: $?";
+	copy("codeml.outfile", $codeml_outfile) or die "$?";
+	print "Here we are!\n";
+	copy("4fold.nuc", "baseml.infile") or die "$?";
+	system ("baseml") == 0 or die "baseml failed: $?";
+	copy ("baseml.outfile", $fourfold_outfile) or die "\n\nCOULD NOT COPY 4fold.res: $?\n\n";
+	copy($infile, "baseml.infile") or die "$?";
+	system ("baseml") == 0 or die "baseml failed: $?";
+	copy ("baseml.outfile", $baseml_outfile) or die "$?\n\n";
+	unlink 'codeml.infile', 'codeml.outfile', '4fold.nuc', '4fold.res';
+	shift;
+	last unless $ARGV[0];
+}
+print "Done!\n";
+

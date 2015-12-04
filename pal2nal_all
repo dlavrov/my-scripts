@@ -1,0 +1,31 @@
+#! /usr/bin/perl -w
+use strict;
+use warnings;
+foreach my $file (@ARGV) {
+	my $ntfile = $file;
+	my $aafile = $file;
+	my $outfile = $file;
+	$ntfile =~ s/(.*).seq/$1.nt/;	
+	$aafile =~ s/(.*).seq/$1.mf/;
+	$outfile =~ s/(.*).seq/$1.aln/;
+	#$outfile =~ s/(.*).seq/$1.paml/;
+	#open(IN,"<$file") || die "Can't read from \"$file\": $!\n";
+	#my @all_lines = <IN>;
+	#close(IN) or die "Can't close $file: $!\n";
+	#open(OUT,">$file")|| die "Can't open \"$file\": $!\n";
+	#foreach my $line (@all_lines) {
+	#	print "$line";
+	#	if ($line =~ /^>/) {
+	#		$line =~ s/>(..........).*/>$1/;
+	#	}
+	#	print OUT "$line";
+	#}
+	#close(OUT) or die "Can't close \"$file\": $!";
+        die "Can't read from file $file!\n" unless -r $file;	
+	system "mafft --auto $file > $aafile";  
+	#system "muscle -in $file -out $aafile -clwstrict" #problem output order is not the same as input; can only rely on names;
+	#system "clustalw $file -outorder=input";
+	system "pal2nal $aafile $ntfile -output paml > $outfile";
+	#system "pal2nal $aafile $ntfile -output clustal > $outfile";
+}
+print "Done!\n";

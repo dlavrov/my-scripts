@@ -1,0 +1,61 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                   gorcom                                  #
+$VERSION=                       "version 1.0"                              ;#
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 10/14/2001,                          #
+#############################################################################
+
+use strict;
+my $file = shift();
+my @files_to_compare = @ARGV;
+my $line;
+my $shared = "";
+my $unique = "";
+&usage if @files_to_compare <1;
+open(IN, "$file") or die "Can't read $file: $!\n";
+while (<IN>) {
+	next if /^;/;
+	chomp($line = $_);
+	last;
+	}
+close(IN) or die "Can't close $file: $!\n";
+my @first_genome = split(/ /,$line);
+@first_genome = sort(@first_genome);
+
+foreach my $file2 (@files_to_compare) {
+	die("must define a valid seqfile to read") unless ( defined $file2 && -r $file2);
+	open(IN, "$file2") or die "Can't read $file2: $!\n";
+	while (<IN>) {
+		next if /^;/;
+		chomp($line = $_);
+		last;
+		}
+	close(IN) or die "Can't close $file2: $!\n";
+	my @second_genome = split(/ /,$line);
+	@second_genome = sort(@second_genome);
+	my $boundary_one;
+	my $boundary_two;
+	#print "My first genome: @first_genome\n";
+	#print "My second genome: @second_genome\n";
+	$shared .= "\n;+++++++++++ $file : $file2 ++++++++++++\n";
+	$unique .= "\n;+++++++++++ $file : $file2 ++++++++++++\n";
+	LOOP1: foreach $boundary_one(@first_genome) {
+		LOOP2: foreach $boundary_two(@second_genome) {
+			if ($boundary_one eq $boundary_two) {
+				$shared .= "$boundary_two ";
+				next LOOP1;
+			}
+		}
+		$unique .= "$boundary_one ";
+	}
+}
+
+print "\nShared boundaries:\n$shared\n";
+print "\nUnique boundaries:\n$unique\n" if (scalar(@files_to_compare) < 2);
+
+sub usage {
+	print "SOMETHING\n";
+	exit;
+	}
