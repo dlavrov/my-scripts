@@ -1,0 +1,76 @@
+#!/usr/bin/perl
+use strict;
+use subs ( '&Proj_ReadProj', '&Proj_Query' );  # imported from ProjPack.pl
+
+require( "ogmp/gc.pl" );
+require( "ogmp/gene_names.pl" );
+require( "ogmp/gene.pl" );
+require( "ogmp/qualifs.pl" );
+require( "ogmp/prot.pl" );
+require( "ogmp/ProjPack.pl" );
+
+
+&Proj_ReadProj( "/usr/local/lib/genome_name.lst" );
+
+sub usage{
+print "usage:
+mf2fasta <masterfile>
+fasta output to STDOUT\n";
+exit;
+}
+
+sub rename_seq{
+# keep only the basename                                                                                                                                             
+	my($mf_name) = @_;
+	$mf_name = $mf_name =~ s/\..*//r;                                                                                                                       
+	my ($i, $mf_name, $genome, $master, $species, $header_info);
+	my (@masters,@genomes);
+        my %id =           # hash array describing the abbrev associated to a genome id returned by the ProjPack library
+      (
+    'M' => 'mt',
+    'P' => 'pt',
+    'N' => 'nuc',
+    'B' => 'bt',
+      );    
+# If the mf is a known mf, fetch info of genome_names.lst so we can display                                                                                          
+# this info in the header of each sequence                                                                                                                            
+   $genome = &Proj_Query ("^\Q$mf_name\E", 'MASTERFILE', 'GENOME');                                                                                                  
+   if( $genome )                                                                                                                                                     
+   {                                                                                                                                                                 
+      $master = &Proj_Query("^\Q$mf_name\E", 'MASTERFILE', 'MASTER');                                                                                                
+      @masters = split ("\0", $master), @genomes = split ("\0", $genome);                                                                                            
+      for (my $i = 0; $i <= $#masters ; $i++)                                                                                                                           
+      {                                                                                                                                                              
+         last if $masters[$i] eq $mf_name;                                                                                                                           
+      }                                                                                                                                                              
+      $species = &Proj_Query ("^\Q$mf_name\E", 'MASTERFILE', 'SPECIES');                                                                                             
+      $header_info = "$species $id{ $genomes[$i] }";                                                                                                                 
+   }                                                                                                                                                                 
+# If not a known mf, the header info of each protein is just the file name                                                                                           
+   else                                                                                                                                                              
+   {                                                                                                                                                                 
+      $header_info = $mf_name;                                                                                                                                       
+   }                                                                                                                                                                 
+print($header_info);                                                                                                                                                                     
+my $out_name = "$mf_name".".fa";
+
+# If outfile already exists, create backup                                                                                                                           
+   if( -e $out_name )                                                                                                                                                
+   {  
+	use File::Copy qw(copy);                                                                                                                                             
+	my $bak_name = "$out_name".".bak";   
+	copy $out_name, $bak_name;
+      	#`$COPY $out_name $out_name.bak`;                                                                                                                               
+      	&clean_die ("Cannot back up file $out_name") if $?;                                                                                                            
+      	print "Wrote $out_name.bak\n";                                                                                                                                 
+   }                                                                                                                                                                 
+}
+
+&usage unless @ARGV;
+
+use File::Copy qw(copy);
+my $new_file = rename_seq($ARGV[0]);
+copy $ARGV[0], $new_file;
+my @args = ("cleanogmp", "-f", "$new_file");
+system(@args) == 0
+	or die "system @args failed: $?";

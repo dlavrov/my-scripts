@@ -17,7 +17,7 @@ my %downhash=();
 my %muphash=();
 my %mdnhash=();
 my $taxlabels;
-my %standard_genes=('atp6' => "",'atp8' => "",'atp9' => "",'cob' => "",'cox1' => "",'cox2' => "",'cox3' => "",'nad1' => "",'nad2' => "",'nad3' => "",'nad4' => "",'nad4L' => "",'nad5' => "",'nad6' => "",'rnl' => "",'rns' => "",'trnA' => "",'trnC' => "",'trnD' => "",'trnE' => "",'trnF' => "",'trnG' => "",'trnH' => "",'trnI' => "",'trnI_cau' => "",'trnK' => "",'trnL_uaa' => "",'trnL_uag' => "",'trnM' => "",'trnM_caue' => "",'trnN' => "",'trnP' => "",'trnQ' => "",'trnR' => "",'trnR_ucu' => "",'trnS_gcu' => "",'trnS_uga' => "",'trnT' => "",'trnV' => "",'trnW' => "",'trnY' => "");
+my %standard_genes=('atp6' => 0,'atp8' => 0,'atp9' => 0,'cob' => 0,'cox1' => 0,'cox2' => 0,'cox3' => 0,'nad1' => 0,'nad2' => 0,'nad3' => 0,'nad4' => 0,'nad4L' => 0,'nad5' => 0,'nad6' => 0,'rnl' => 0,'rns' => 0,'trnA_ugc' => 0,'trnC_gca' => 0,'trnD_guc' => 0,'trnE_uuc' => 0,'trnF_gaa' => 0,'trnG_ucc' => 0,'trnH_gug' => 0,'trnI_gau' => 0,'trnI_cau' => 0,'trnK_uuu' => 0,'trnL_uaa' => 0,'trnL_uag' => 0,'trnM_cau' => 0,'trnM_caue' => 0,'trnN_guu' => 0,'trnP_ugg' => 0,'trnQ_uug' => 0,'trnR_ucg' => 0,'trnR_ucu' => 0,'trnS_gcu' => 0,'trnS_uga' => 0,'trnT_ugu' => 0,'trnV_uac' => 0,'trnW_uca' => 0,'trnY_gua' => 0);
 my %asc=('0','A','1','B','2','C','3','D','4','E','5','F','6','G','7','H','8','I','9','J','10','K','11','L','12','M','13','N','14','O','15','P','16','Q','17','R','18','S','19','T','20','U','21','V','22','W','23','X','24','Y','25','Z');
 
 for my $j(0..(scalar(@ARGV)-1)) #for all my files with the gene order info
@@ -52,7 +52,7 @@ for my $j(0..(scalar(@ARGV)-1)) #for all my files with the gene order info
  	my $rightindex=0; ##CHANGED FROM 1;
  	my $sign="+"; ## + by default
  	my $current_gene="";
-	my %test_hush = %standard_genes;
+	my %test_hush = %standard_genes; #NOT sure why I duplicated the hash
 	my $test=join ' ', (keys(%test_hush));
 	$test=" ".$test." ";
  	foreach my $g(@genes)
@@ -135,7 +135,7 @@ for my $j(0..(scalar(@ARGV)-1)) #for all my files with the gene order info
 			my $match_found=0;
 			for (my $a=0; $a <= $array_length; $a++)
 			{	
-				if ($uphash{$current_gene}->[$a]=~$upgene)
+				if ($uphash{$current_gene}->[$a] && $uphash{$current_gene}->[$a]=~$upgene) ## Potentially something fishy here: the first part is empty sometimes
 				{
 					my $val=$asc{$a};
 					$muphash{$current_gene}->[$j]=$val;
@@ -163,7 +163,7 @@ for my $j(0..(scalar(@ARGV)-1)) #for all my files with the gene order info
 			my $match_found=0;
 			for (my $a=0; $a <= $array_length; $a++)
 			{	
-				if ($downhash{$current_gene}->[$a]=~$downgene)
+				if ($downhash{$current_gene}->[$a] && $downhash{$current_gene}->[$a]=~$downgene)  ## Potentially something fishy going here: the first part is empty sometimes
 				{
 					my $val=$asc{$a};
 					$mdnhash{$current_gene}->[$j]=$val;
@@ -187,7 +187,7 @@ for my $j(0..(scalar(@ARGV)-1)) #for all my files with the gene order info
 	}
 	my @test_keys=sort{$a cmp $b}(keys(%test_hush));
 	foreach my $k(@test_keys) {
-		if ($k!~/trn/ and $test_hush{$k}=="") 
+		if ($k!~/trn/ and $test_hush{$k}==0) 
 		{
 			print "Warning: gene $k is not present in species $ARGV[$j]!\n";
 		}
@@ -280,7 +280,7 @@ foreach my $k(@sorted_keys)
 
 print OUT ";\nend;\n";
 close(OUT) or die "Can't close \"$outfile\": $!\n";
-print "Done!\n";
+print "Done!\n"
 
 
 

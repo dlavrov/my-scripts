@@ -1,6 +1,23 @@
 #! /usr/bin/perl -w
 use strict;
 use warnings;
+my $choice = 1;
+my $format;
+for (;;)
+{
+        die "Usage: mcons [-f{1-3}] alignment_file(s), where 1 = paml (default), 2 = fasta, 3 = clustal\n" unless (@ARGV);
+        my ($opt) = ($ARGV[0] =~ /^-(\w).*$/);
+        last unless $opt;
+        die "Invalid option: \"$opt\"!\n" unless $opt =~ /f/;
+        ($choice) = ($ARGV[0] =~ /^-f(\d).*$/) if $opt eq "f";
+        print STDERR "Format=$choice\n";
+        shift;
+	}
+die "Wrong file choice!\n" if ($choice != 1 && $choice != 2 && $choice != 3);
+if ($choice == 1) {$format = 'paml'}
+elsif ($choice == 2) {$format = 'fasta'}
+elsif ($choice == 3) {$format = 'clustal'}
+else {print "$choice is not a valid option!"}
 foreach my $file (@ARGV) {
 	my $ntfile = $file;
 	my $aafile = $file;
@@ -25,7 +42,7 @@ foreach my $file (@ARGV) {
 	system "mafft --auto $file > $aafile";  
 	#system "muscle -in $file -out $aafile -clwstrict" #problem output order is not the same as input; can only rely on names;
 	#system "clustalw $file -outorder=input";
-	system "pal2nal $aafile $ntfile -output paml > $outfile";
-	#system "pal2nal $aafile $ntfile -output clustal > $outfile";
+	#system "pal2nal $aafile $ntfile -output paml > $outfile";
+	system "pal2nal $aafile $ntfile -output $format > $outfile";
 }
 print "Done!\n";
