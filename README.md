@@ -38,6 +38,7 @@ gb2mf
 genomestats  
 get-contigs  
 get-contigs-org  
+`gname2num.phy`, change gene names to numbers in a GO file
 go2gr  
 go2nex  
 go2nex.old  
@@ -58,13 +59,13 @@ length-hist
 make_codon_table  
 mcons  
 mcons.old  
-mf2cc  
+mf2cc, create a coordinate file or a gene order file from a masterfile.  
 mf2fasta  
 mf2fasta.new  
 mkngs  
-mpepper, `pepper -t` on multiple files  
-mtann, quick annotation of mitochondrial genomes  
-newalign, program to select, align, and concatenated sequences from individual mitochondrial genes  
+`mpepper`, `pepper -t` on multiple files  
+`mtann`, quick annotation of mitochondrial genomes  
+`newalign`, program to select, align, and concatenated sequences from individual mitochondrial genes  
 ntsoapalign  
 pal2nal  
 pal2nal_all  
@@ -87,14 +88,13 @@ rmtrees
 rmtrees_consel  
 sauveguard  
 seq2seq  
-skiptRNA, a program to convert multiple GO files into a NEXUS file for MPMEMG analysis  
-soapalign  
+`skiptRNA`, a program to convert multiple GO files into a NEXUS file for MPMEMG analysis  
+`soapalign`, replaced by `newalign`; a program to select, align, and concatenated sequences from individual mitochondrial genes  
 soapalign.mod  
 soapalign.pretdy  
-soapalign_old  
-soapalign_old_old  
 sort-seqs  
 split2cont  
+`splitGO`, a perl script to split a multi-species go file into individual go files (used as input by `skiptRNA` program) 
 sto2ali  
 talign  
 temp  
