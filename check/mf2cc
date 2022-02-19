@@ -1,0 +1,77 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Bio::SeqIO;
+my $gene_order;
+for (;;)
+{
+        die "Usage: mf2cc [-go] masterfile\n" unless (@ARGV);
+        my ($opt) = ($ARGV[0] =~ /^-(go).*$/);
+	$gene_order = 1 if $opt; # eq "go";
+	last unless $opt;
+	shift;
+        }
+for (;;) {
+last unless (@ARGV);	
+my $io = Bio::SeqIO->new(-format => 'mf', -file => "$ARGV[0]");
+my $outfile = $ARGV[0];
+my $species_name;
+
+##### replacing go name
+my $file = '/usr/local/lib/genome_name.lst';
+open ( NAMES, "$file") or die  "Could not open $file:$!\n";
+while (<NAMES>)
+{
+    chomp;
+    if (/$ARGV[0]/)
+    {
+        $species_name = $_;
+	$species_name =~ s/^.*\s(\w+)\s*/$1/;
+    }
+}
+close (NAMES); 
+######
+
+$outfile =~ s/\..+$/.cc/;
+print ($outfile."\n");
+my $seq = $io->next_seq;
+open( OUT, ">$outfile" ) or die "Can't open the file $outfile:$!\n";
+my @features = $seq->get_SeqFeatures;
+if ($gene_order) {
+	print OUT ">".$species_name."\n";
+}
+else {
+	print OUT "genome\t1\t".$seq->length."\n";
+}
+foreach my $feat ( sort {$a->start <=> $b->start} @features ) {
+	        print STDERR "Feature ",$feat->primary_tag," starts ",$feat->start," ends ", $feat->end," strand ",$feat->strand,"\n";
+	}
+#foreach(@features){
+foreach ( sort {$a->start <=> $b->start} @features ) {
+        my $gene = ($_->get_tag_values('gene'))[0];
+	if ($gene =~ /-I\d/ || $gene =~ /-E\d/) { #eliminates introns/exons!
+		next;
+	}
+	else {
+	    if ($gene_order) {
+		if ($_->strand == 1) {
+			print OUT "+".$gene." ";
+		}
+		elsif ($_->strand == -1) {
+			print OUT "-".$gene." ";
+		}
+		else {
+			print "Annotation error with the gene $gene\n";
+		}
+	    } 
+	    else {
+		print OUT $gene."\t".$_->start."\t".$_->end."\n";
+	    }
+      }
+}
+print OUT "\n" if $gene_order;
+close(OUT) or die "Can't close $outfile:$!\n";
+shift;
+}
+

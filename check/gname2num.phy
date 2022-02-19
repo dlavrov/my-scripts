@@ -1,0 +1,40 @@
+#!/usr/local/bin/python
+# My first python program!
+# Replaces gene name by number to use on MLGO server
+# Requires /usr/local/bin/my_scripts/genes.txt
+
+import re
+import sys
+import os
+pattern = re.compile("^>")
+
+# getting the file name from sys.argv
+file_name = sys.argv[1]
+
+# checking that the go file exist:
+if not os.path.isfile(file_name):
+   sys.exit()
+
+# changing gene name into gene number
+d = {}
+with open("/usr/local/bin/my_scripts/genes.txt") as f:
+    for line in f:
+       (key, val) = line.split()
+       d[key] = val
+
+
+
+f = open(file_name, 'r') 
+for line in f:
+   line = line.rstrip()
+   if not line.strip():
+      continue
+   if pattern.match(line):
+      print(line)
+      continue
+   for f_key, f_value in d.items():
+      if f_key in line:
+         line = line.replace(f_key, f_value)
+   line = line + ' $'
+   print(line)
+f.close

@@ -1,0 +1,49 @@
+#!/usr/bin/perl -w
+#############################################################################
+#                                   splitgo                                 #
+$VERSION = "version 0.1";    						    #
+#                                                                           #
+#                             By Dennis Lavrov                              #
+#                        last modified 06/25/2018,                          #
+#############################################################################
+
+# This is a short script written to accomodate the skiptrna program, which
+# works with individual gene order files rather than a single file
+
+
+use strict;
+use warnings;
+die "Usage: splitgo <gene order file in GO format>\n" unless $ARGV[0];
+
+my $species_name="";
+my $gene_order="";
+
+while (<>) {
+	chomp;
+	if (/^\s*;/ or /^\s*$/) { next;}
+	elsif (/^>\S+/ and $species_name eq "") {
+		s/^>(\w+)\W+/$1/;
+		$species_name = $_;
+		next;
+	}
+	elsif ($species_name and $gene_order eq "") {
+		$gene_order = $_;
+	}
+	else {
+		die "Wrong file format: $_\n";
+	}
+	####
+	print2file($species_name,$gene_order);	
+	$species_name="";
+	$gene_order="";
+}
+
+sub print2file {
+	my ($species_name, $gene_order) = @_;
+	my $outfile = "$species_name".'.go';
+	open( OUT, ">$outfile" ) or die "Can't open the file $outfile:$!\n";
+        print OUT ";; "."$species_name"."\n";
+	print OUT "$gene_order"."\n";
+	#print OUT "\n" if $gene_order;
+	close(OUT) or die "Can't close $outfile:$!\n";
+}
